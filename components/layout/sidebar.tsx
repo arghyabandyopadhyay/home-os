@@ -1,16 +1,15 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Home,
   NotebookPen,
   CheckSquare,
   Library,
   Users,
-  BookOpen,
   Settings,
-} from "lucide-react"
+} from "lucide-react";
 
 const items = [
   {
@@ -39,35 +38,26 @@ const items = [
     icon: Users,
   },
   {
-    title: "Reading Room",
-    href: "/reading-room",
-    icon: BookOpen,
-  },
-  {
     title: "Settings",
     href: "/settings",
     icon: Settings,
   },
-]
+];
 
 export function Sidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-72 flex-col border-r border-white/10 bg-zinc-950">
+    <aside className="flex h-screen w-72 flex-col border-r border-white/10 bg-[#111118]">
       <div className="border-b border-white/10 p-6">
-        <h1 className="text-2xl font-bold text-white">
-          Home OS
-        </h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Your digital home
-        </p>
+        <h1 className="text-2xl font-bold text-white">Home OS</h1>
+        <p className="mt-1 text-sm text-zinc-400">Your digital home</p>
       </div>
 
       <nav className="flex-1 space-y-2 p-4">
         {items.map((item) => {
-          const Icon = item.icon
-          const active = pathname === item.href
+          const Icon = item.icon;
+          const active = pathname === item.href;
 
           return (
             <Link
@@ -82,9 +72,9 @@ export function Sidebar() {
               <Icon size={18} />
               {item.title}
             </Link>
-          )
+          );
         })}
       </nav>
     </aside>
-  )
+  );
 }
