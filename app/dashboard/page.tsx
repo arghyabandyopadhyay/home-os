@@ -6,6 +6,7 @@ import { BookOpen, CheckSquare, FileText } from "lucide-react";
 export default async function DashboardPage() {
   const user = await ensureProfile();
   const supabase = await createClient();
+  // Fetch user data and recent items in parallel
 
   const {
     data: { user: authUser },
