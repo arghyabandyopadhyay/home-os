@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { ensureProfile } from "@/lib/create-profile";
 import { BookOpen, CheckSquare, FileText } from "lucide-react";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const user = await ensureProfile();
@@ -11,6 +12,10 @@ export default async function DashboardPage() {
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const [tasksRes, notesRes, booksRes] = await Promise.all([
     supabase
