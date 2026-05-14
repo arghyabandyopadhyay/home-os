@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 
-interface GoogleBookInfo {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+interface OpenLibraryDoc {
+  key?: string;
   title?: string;
-  authors?: string[];
-  imageLinks?: {
-    thumbnail?: string;
-  };
-  description?: string;
-  publishedDate?: string;
-  previewLink?: string;
-  infoLink?: string;
-  language?: string;
+  author_name?: string[];
+  first_publish_year?: number;
+  cover_i?: number;
 }
 
-interface GoogleBookItem {
-  id?: string;
-  volumeInfo?: GoogleBookInfo;
+interface OpenLibraryResponse {
+  docs?: OpenLibraryDoc[];
 }
 
 interface GoogleBooksResponse {
-  items?: GoogleBookItem[];
+  items?: {
+    volumeInfo?: {
+      description?: string;
+      previewLink?: string;
+      infoLink?: string;
+    };
+  }[];
 }
 
 interface BookResult {
@@ -33,10 +36,9 @@ interface BookResult {
   external_id: string;
 }
 
-const API_KEY = process.env.GOOGLE_BOOKS_API_KEY; // Optional: Use if you have an API key for higher rate limits
-// Simple in-memory cache with TTL (1 hour)
 const cache = new Map<string, { data: BookResult | null; timestamp: number }>();
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+const CACHE_TTL = 1000 * 60 * 60;
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q");
@@ -45,65 +47,103 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Query required" }, { status: 400 });
   }
 
-  // Check cache
   const cached = cache.get(query);
+
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return NextResponse.json({ data: cached.data });
+    return NextResponse.json({
+      data: cached.data,
+    });
   }
 
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-        query,
-      )}&langRestrict=en&maxResults=1&key=${API_KEY}`,
-    );
+    // Open Library search
+    const openLibraryUrl = new URL("https://openlibrary.org/search.json");
 
-    if (res.status === 429) {
-      return NextResponse.json(
-        { error: "Rate limited. Please try again later." },
-        { status: 429 },
-      );
-    }
+    openLibraryUrl.searchParams.set("title", query);
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `API error: ${res.statusText}` },
-        { status: res.status },
-      );
-    }
+    openLibraryUrl.searchParams.set("limit", "1");
 
-    const data = (await res.json()) as GoogleBooksResponse;
-    const item = data.items?.find((book: GoogleBookItem) => {
-      const info = book.volumeInfo;
-      return (
-        info?.language === "en" &&
-        info.title?.toLowerCase().includes(query.toLowerCase())
-      );
+    const openLibraryRes = await fetch(openLibraryUrl.toString(), {
+      next: { revalidate: 3600 },
     });
 
-    if (!item || !item.volumeInfo || !item.id) {
-      cache.set(query, { data: null, timestamp: Date.now() });
-      return NextResponse.json({ data: null });
+    if (!openLibraryRes.ok) {
+      return NextResponse.json(
+        { error: "Failed to fetch books" },
+        { status: openLibraryRes.status },
+      );
     }
 
-    const info = item.volumeInfo;
+    const openLibraryData =
+      (await openLibraryRes.json()) as OpenLibraryResponse;
+
+    const book = openLibraryData.docs?.[0];
+
+    if (!book) {
+      cache.set(query, {
+        data: null,
+        timestamp: Date.now(),
+      });
+
+      return NextResponse.json({
+        data: null,
+      });
+    }
+
+    // Google Books metadata fetch (NO API KEY)
+    let description = "";
+    let preview_url = "";
+    let info_url = "";
+
+    try {
+      const googleRes = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+          query,
+        )}&maxResults=1&key=${process.env.GOOGLE_BOOKS_API_KEY || ""}`,
+      );
+
+      if (googleRes.ok) {
+        const googleData = (await googleRes.json()) as GoogleBooksResponse;
+
+        const googleBook = googleData.items?.[0]?.volumeInfo;
+
+        description = googleBook?.description || "";
+
+        preview_url = googleBook?.previewLink || "";
+
+        info_url = googleBook?.infoLink || "";
+      }
+    } catch (err) {
+      console.error("Google Books metadata fetch failed:", err);
+    }
+
     const result: BookResult = {
-      title: info.title || "",
-      author: info.authors?.[0] || "",
-      cover_url: info.imageLinks?.thumbnail || "",
-      description: info.description || "",
-      published_year: info.publishedDate || "",
-      preview_url: info.previewLink || "",
-      info_url: info.infoLink || "",
-      external_id: item.id,
+      title: book.title || "",
+      author: book.author_name?.[0] || "Unknown",
+      cover_url: book.cover_i
+        ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg`
+        : "",
+      description,
+      published_year: book.first_publish_year
+        ? String(book.first_publish_year)
+        : "",
+      preview_url,
+      info_url:
+        info_url || (book.key ? `https://openlibrary.org${book.key}` : ""),
+      external_id: book.key || "",
     };
 
-    // Cache the result
-    cache.set(query, { data: result, timestamp: Date.now() });
+    cache.set(query, {
+      data: result,
+      timestamp: Date.now(),
+    });
 
-    return NextResponse.json({ data: result });
+    return NextResponse.json({
+      data: result,
+    });
   } catch (error) {
     console.error("Book search error:", error);
+
     return NextResponse.json(
       { error: "Failed to search books" },
       { status: 500 },
