@@ -1,7 +1,22 @@
 import { getBooks } from "@/lib/books";
 import { LibraryView } from "@/components/library/library-view";
+import { createClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/create-profile";
+import { redirect } from "next/navigation";
 
 export default async function LibraryPage() {
+  const user = await ensureProfile();
+  const supabase = await createClient();
+  // Fetch user data and recent items in parallel
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const books = await getBooks();
 
   return (
