@@ -9,6 +9,7 @@ import {
   CommandItem,
   CommandEmpty,
   CommandGroup,
+  CommandSeparator,
 } from "@/components/ui/command";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -17,18 +18,43 @@ import {
   LayoutDashboard,
   FileText,
   CheckSquare,
+  CalendarDays,
+  Plus,
+  Settings,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { Book } from "@/types/book";
 import type { Contact } from "@/types/contact";
+import type { Note } from "@/types/note";
+import type { Task } from "@/types/task";
 
 export function CommandMenu() {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [books, setBooks] = React.useState<Book[]>([]);
   const [contacts, setContacts] = React.useState<Contact[]>([]);
+  const [notes, setNotes] = React.useState<Note[]>([]);
+  const [tasks, setTasks] = React.useState<Task[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  const resetSearchState = React.useCallback(() => {
+    setSearch("");
+    setBooks([]);
+    setContacts([]);
+    setNotes([]);
+    setTasks([]);
+  }, []);
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (!nextOpen) resetSearchState();
+    },
+    [resetSearchState],
+  );
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -39,15 +65,11 @@ export function CommandMenu() {
     };
 
     document.addEventListener("keydown", down);
-
     return () => document.removeEventListener("keydown", down);
   }, []);
 
   React.useEffect(() => {
     if (!open) {
-      setSearch("");
-      setBooks([]);
-      setContacts([]);
       return;
     }
 
@@ -60,27 +82,50 @@ export function CommandMenu() {
 
         if (!user) return;
 
-        const query = search.toLowerCase();
+        const q = search.trim();
+        if (!q) {
+          setBooks([]);
+          setContacts([]);
+          setNotes([]);
+          setTasks([]);
+          return;
+        }
 
-        const [booksRes, contactsRes] = await Promise.all([
+        const pattern = `%${q}%`;
+
+        const [booksRes, contactsRes, notesRes, tasksRes] = await Promise.all([
           supabase
             .from("books")
             .select("*")
             .eq("user_id", user.id)
-            .or(`title.ilike.%${query}%,author.ilike.%${query}%`)
+            .or(`title.ilike.${pattern},author.ilike.${pattern}`)
             .limit(5),
           supabase
             .from("contacts")
             .select("*")
             .eq("user_id", user.id)
             .or(
-              `name.ilike.%${query}%,email.ilike.%${query}%,company.ilike.%${query}%`,
+              `name.ilike.${pattern},email.ilike.${pattern},company.ilike.${pattern}`,
             )
+            .limit(5),
+          supabase
+            .from("notes")
+            .select("*")
+            .eq("user_id", user.id)
+            .or(`title.ilike.${pattern},content.ilike.${pattern}`)
+            .limit(5),
+          supabase
+            .from("tasks")
+            .select("*")
+            .eq("user_id", user.id)
+            .ilike("title", pattern)
             .limit(5),
         ]);
 
         setBooks(booksRes.data || []);
         setContacts(contactsRes.data || []);
+        setNotes(notesRes.data || []);
+        setTasks(tasksRes.data || []);
       } catch (error) {
         console.error("Search error:", error);
       } finally {
@@ -97,99 +142,225 @@ export function CommandMenu() {
     setOpen(false);
   };
 
-  const hasResults = books.length > 0 || contacts.length > 0;
+  async function createNote() {
+    setCreating(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("notes")
+        .insert({ user_id: user.id, title: "Untitled", content: "" })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      handleSelect(`/notes/${data.id}`);
+    } catch {
+      toast.error("Could not create note");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function createTask() {
+    setCreating(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("tasks")
+        .insert({ user_id: user.id, title: "New task", completed: false })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      handleSelect("/tasks");
+      toast.success("Task created");
+    } catch {
+      toast.error("Could not create task");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const hasSearchResults =
+    books.length > 0 ||
+    contacts.length > 0 ||
+    notes.length > 0 ||
+    tasks.length > 0;
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog open={open} onOpenChange={handleOpenChange}>
       <CommandInput
-        placeholder="Search books, contacts, or navigate..."
+        placeholder="Search or type a command…"
         value={search}
         onValueChange={setSearch}
       />
 
       <CommandList>
         <CommandEmpty>
-          {loading ? "Searching..." : "No results found."}
+          {loading ? "Searching…" : search ? "No results." : "Type to search your home."}
         </CommandEmpty>
 
         {!search && (
-          <CommandGroup heading="Navigation">
-            <CommandItem
-              onSelect={() => handleSelect("/dashboard")}
-              className="cursor-pointer"
-            >
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect("/notes")}
-              className="cursor-pointer"
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Notes
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect("/tasks")}
-              className="cursor-pointer"
-            >
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Tasks
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect("/library")}
-              className="cursor-pointer"
-            >
-              <BookOpen className="mr-2 h-4 w-4" />
-              Library
-            </CommandItem>
-            <CommandItem
-              onSelect={() => handleSelect("/contacts")}
-              className="cursor-pointer"
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Contacts
-            </CommandItem>
-          </CommandGroup>
-        )}
-
-        {books.length > 0 && (
-          <CommandGroup heading="Books">
-            {books.map((book) => (
+          <>
+            <CommandGroup heading="Quick actions">
               <CommandItem
-                key={book.id}
-                onSelect={() => handleSelect(`/library`)}
+                onSelect={() => createNote()}
+                disabled={creating}
+                className="cursor-pointer"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New note
+              </CommandItem>
+              <CommandItem
+                onSelect={() => createTask()}
+                disabled={creating}
+                className="cursor-pointer"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New task
+              </CommandItem>
+            </CommandGroup>
+
+            <CommandSeparator />
+
+            <CommandGroup heading="Go to">
+              <CommandItem
+                onSelect={() => handleSelect("/dashboard")}
+                className="cursor-pointer"
+              >
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Today
+              </CommandItem>
+              <CommandItem
+                onSelect={() => handleSelect("/notes")}
+                className="cursor-pointer"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Notes
+              </CommandItem>
+              <CommandItem
+                onSelect={() => handleSelect("/tasks")}
+                className="cursor-pointer"
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                Tasks
+              </CommandItem>
+              <CommandItem
+                onSelect={() => handleSelect("/calendar")}
+                className="cursor-pointer"
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Calendar
+              </CommandItem>
+              <CommandItem
+                onSelect={() => handleSelect("/library")}
                 className="cursor-pointer"
               >
                 <BookOpen className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>{book.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {book.author}
-                  </span>
-                </div>
+                Library
               </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {contacts.length > 0 && (
-          <CommandGroup heading="Contacts">
-            {contacts.map((contact) => (
               <CommandItem
-                key={contact.id}
-                onSelect={() => handleSelect(`/contacts`)}
+                onSelect={() => handleSelect("/contacts")}
                 className="cursor-pointer"
               >
                 <Users className="mr-2 h-4 w-4" />
-                <div className="flex flex-col">
-                  <span>{contact.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {contact.email || contact.company}
-                  </span>
-                </div>
+                Contacts
               </CommandItem>
-            ))}
-          </CommandGroup>
+              <CommandItem
+                onSelect={() => handleSelect("/settings")}
+                className="cursor-pointer"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </CommandItem>
+            </CommandGroup>
+          </>
+        )}
+
+        {search && hasSearchResults && (
+          <>
+            {tasks.length > 0 && (
+              <CommandGroup heading="Tasks">
+                {tasks.map((task) => (
+                  <CommandItem
+                    key={task.id}
+                    onSelect={() => handleSelect("/tasks")}
+                    className="cursor-pointer"
+                  >
+                    <CheckSquare className="mr-2 h-4 w-4" />
+                    {task.title}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {notes.length > 0 && (
+              <CommandGroup heading="Notes">
+                {notes.map((note) => (
+                  <CommandItem
+                    key={note.id}
+                    onSelect={() => handleSelect(`/notes/${note.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    {note.title}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {books.length > 0 && (
+              <CommandGroup heading="Books">
+                {books.map((book) => (
+                  <CommandItem
+                    key={book.id}
+                    onSelect={() =>
+                      handleSelect(
+                        book.file_path ? `/reader/${book.id}` : "/library",
+                      )
+                    }
+                    className="cursor-pointer"
+                  >
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span>{book.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {book.author}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {contacts.length > 0 && (
+              <CommandGroup heading="Contacts">
+                {contacts.map((contact) => (
+                  <CommandItem
+                    key={contact.id}
+                    onSelect={() => handleSelect("/contacts")}
+                    className="cursor-pointer"
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span>{contact.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {contact.email || contact.company}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </>
         )}
       </CommandList>
     </CommandDialog>

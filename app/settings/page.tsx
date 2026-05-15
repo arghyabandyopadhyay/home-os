@@ -6,20 +6,16 @@ import { toast } from "sonner";
 import {
   User,
   Lock,
-  Bell,
-  Palette,
   Download,
   Trash2,
   LogOut,
   Eye,
   EyeOff,
-  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { PreferencesSection } from "@/components/settings/preferences-section";
 import { motion } from "framer-motion";
 
 interface UserProfile {
@@ -36,13 +32,6 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [theme, setTheme] = useState("dark");
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    tasks: true,
-    notes: false,
-  });
   const supabase = createClient();
 
   const loadProfile = useCallback(async () => {
@@ -63,15 +52,11 @@ export default function SettingsPage() {
   }, [supabase]);
 
   useEffect(() => {
-    let isMounted = true;
+    const timer = window.setTimeout(() => {
+      void loadProfile();
+    }, 0);
 
-    if (isMounted) {
-      loadProfile();
-    }
-
-    return () => {
-      isMounted = false;
-    };
+    return () => window.clearTimeout(timer);
   }, [loadProfile]);
 
   const updateProfile = async () => {
@@ -131,19 +116,28 @@ export default function SettingsPage() {
 
       if (!user) return;
 
-      const [notes, tasks, contacts, books] = await Promise.all([
-        supabase.from("notes").select("*").eq("user_id", user.id),
-        supabase.from("tasks").select("*").eq("user_id", user.id),
-        supabase.from("contacts").select("*").eq("user_id", user.id),
-        supabase.from("books").select("*").eq("user_id", user.id),
-      ]);
+      const [notes, tasks, contacts, books, events, profile] =
+        await Promise.all([
+          supabase.from("notes").select("*").eq("user_id", user.id),
+          supabase.from("tasks").select("*").eq("user_id", user.id),
+          supabase.from("contacts").select("*").eq("user_id", user.id),
+          supabase.from("books").select("*").eq("user_id", user.id),
+          supabase.from("calendar_events").select("*").eq("user_id", user.id),
+          supabase
+            .from("profiles")
+            .select("preferences")
+            .eq("id", user.id)
+            .single(),
+        ]);
 
       const data = {
         exportedAt: new Date().toISOString(),
+        preferences: profile.data?.preferences ?? {},
         notes: notes.data || [],
         tasks: tasks.data || [],
         contacts: contacts.data || [],
         books: books.data || [],
+        calendarEvents: events.data || [],
       };
 
       const dataStr = JSON.stringify(data, null, 2);
@@ -197,7 +191,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
+    <div className="min-h-screen bg-app text-app">
       {/* Ambient Background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute left-[-10%] top-[-10%] h-[500px] w-[500px] rounded-full bg-blue-500/10 blur-3xl" />
@@ -208,26 +202,26 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-5xl font-semibold tracking-tight text-white">
+            <h1 className="text-5xl font-semibold tracking-tight text-app">
               Settings
             </h1>
 
-            <p className="mt-3 text-lg text-zinc-300/80">
+            <p className="mt-3 text-lg text-app-muted/80">
               Manage your account, preferences and workspace.
             </p>
           </div>
 
-          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#111118]/80 px-5 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-lg font-bold text-white">
+          <div className="flex items-center gap-4 rounded-2xl border border-app panel-app px-5 py-4 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-lg font-bold text-app">
               {profile.full_name?.charAt(0) || "U"}
             </div>
 
             <div>
-              <p className="font-medium text-white">
+              <p className="font-medium text-app">
                 {profile.full_name || "User"}
               </p>
 
-              <p className="text-sm text-zinc-300/70">{profile.email}</p>
+              <p className="text-sm text-app-muted/70">{profile.email}</p>
             </div>
           </div>
         </div>
@@ -237,7 +231,7 @@ export default function SettingsPage() {
           {/* Left Column */}
           <div className="space-y-6 xl:col-span-2">
             {/* Profile */}
-            <Card className="border border-white/10 bg-[#111118]/80 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+            <Card className="border border-app panel-app text-app shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -250,11 +244,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <h2 className="text-2xl font-semibold text-white">
+                    <h2 className="text-2xl font-semibold text-app">
                       Profile Settings
                     </h2>
 
-                    <p className="text-sm text-zinc-300/70">
+                    <p className="text-sm text-app-muted/70">
                       Update your personal information.
                     </p>
                   </div>
@@ -262,7 +256,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-sm text-white/90">
+                    <label className="mb-2 block text-sm text-app/90">
                       Full Name
                     </label>
 
@@ -275,22 +269,22 @@ export default function SettingsPage() {
                         }))
                       }
                       placeholder="Your name"
-                      className="h-12 border-white/10 bg-black/30 text-white placeholder:text-zinc-500 focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                      className="h-12 border-app bg-app-elevated text-app placeholder:text-app-muted focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/20"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-white/90">
+                    <label className="mb-2 block text-sm text-app/90">
                       Email
                     </label>
 
                     <Input
                       value={profile.email}
                       disabled
-                      className="h-12 border-white/5 bg-black/20 text-zinc-300"
+                      className="h-12 border-app bg-app-elevated text-app-muted"
                     />
 
-                    <p className="mt-2 text-xs text-zinc-400">
+                    <p className="mt-2 text-xs text-app-muted">
                       Email cannot be changed
                     </p>
                   </div>
@@ -307,7 +301,7 @@ export default function SettingsPage() {
             </Card>
 
             {/* Password */}
-            <Card className="border border-white/10 bg-[#111118]/80 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+            <Card className="border border-app panel-app text-app shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               <CardContent className="p-7">
                 <div className="mb-8 flex items-center gap-4">
                   <div className="rounded-xl bg-purple-500/10 p-3">
@@ -315,11 +309,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <h2 className="text-2xl font-semibold text-white">
+                    <h2 className="text-2xl font-semibold text-app">
                       Security
                     </h2>
 
-                    <p className="text-sm text-zinc-300/70">
+                    <p className="text-sm text-app-muted/70">
                       Change your password securely.
                     </p>
                   </div>
@@ -327,7 +321,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-sm text-white/90">
+                    <label className="mb-2 block text-sm text-app/90">
                       New Password
                     </label>
 
@@ -337,13 +331,13 @@ export default function SettingsPage() {
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Enter new password"
-                        className="h-12 border-white/10 bg-black/30 pr-12 text-white placeholder:text-zinc-500 focus-visible:border-purple-500/50 focus-visible:ring-2 focus-visible:ring-purple-500/20"
+                        className="h-12 border-app bg-app-elevated pr-12 text-app placeholder:text-app-muted focus-visible:border-purple-500/50 focus-visible:ring-2 focus-visible:ring-purple-500/20"
                       />
 
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 transition hover:text-white"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-app-muted transition hover:text-app"
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4" />
@@ -355,7 +349,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-white/90">
+                    <label className="mb-2 block text-sm text-app/90">
                       Confirm Password
                     </label>
 
@@ -364,14 +358,14 @@ export default function SettingsPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm password"
-                      className="h-12 border-white/10 bg-black/30 text-white placeholder:text-zinc-500 focus-visible:border-purple-500/50 focus-visible:ring-2 focus-visible:ring-purple-500/20"
+                      className="h-12 border-app bg-app-elevated text-app placeholder:text-app-muted focus-visible:border-purple-500/50 focus-visible:ring-2 focus-visible:ring-purple-500/20"
                     />
                   </div>
 
                   <Button
                     onClick={updatePassword}
                     disabled={loading || !newPassword || !confirmPassword}
-                    className="h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:opacity-90"
+                    className="h-12 w-full rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 text-app hover:opacity-90"
                   >
                     {loading ? "Updating..." : "Update Password"}
                   </Button>
@@ -380,7 +374,7 @@ export default function SettingsPage() {
             </Card>
 
             {/* Danger Zone */}
-            <Card className="border border-red-500/20 bg-red-500/5 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+            <Card className="border border-red-500/20 bg-red-500/5 text-app shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               <CardContent className="p-7">
                 <div className="mb-6 flex items-center gap-4">
                   <div className="rounded-xl bg-red-500/10 p-3">
@@ -398,8 +392,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-red-500/20 bg-black/30 p-5">
-                  <p className="mb-5 text-sm text-zinc-300/80">
+                <div className="rounded-2xl border border-red-500/20 bg-app-elevated p-5">
+                  <p className="mb-5 text-sm text-app-muted/80">
                     Delete your account and all associated data. This action
                     cannot be undone.
                   </p>
@@ -419,100 +413,10 @@ export default function SettingsPage() {
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Notifications */}
-            <Card className="border border-white/10 bg-[#111118]/80 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-              <CardContent className="p-7">
-                <div className="mb-8 flex items-center gap-4">
-                  <div className="rounded-xl bg-orange-500/10 p-3">
-                    <Bell className="h-5 w-5 text-orange-400" />
-                  </div>
+            <PreferencesSection />
 
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">
-                      Notifications
-                    </h2>
-
-                    <p className="text-sm text-zinc-300/70">
-                      Control alerts and reminders.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {Object.entries(notifications).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between rounded-xl border border-white/10 bg-black/20 px-4 py-3"
-                    >
-                      <div>
-                        <p className="font-medium text-white">
-                          {key === "email"
-                            ? "Email notifications"
-                            : key === "push"
-                              ? "Push notifications"
-                              : key === "tasks"
-                                ? "Task reminders"
-                                : "Note updates"}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setNotifications((prev) => ({
-                            ...prev,
-                            [key]: !prev[key as keyof typeof notifications],
-                          }))
-                        }
-                        className={`relative h-6 w-11 rounded-full transition ${
-                          value ? "bg-blue-500" : "bg-zinc-700"
-                        }`}
-                      >
-                        <div
-                          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
-                            value ? "left-6" : "left-1"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Appearance */}
-            <Card className="border border-white/10 bg-[#111118]/80 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-              <CardContent className="p-7">
-                <div className="mb-8 flex items-center gap-4">
-                  <div className="rounded-xl bg-pink-500/10 p-3">
-                    <Palette className="h-5 w-5 text-pink-400" />
-                  </div>
-
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">
-                      Appearance
-                    </h2>
-
-                    <p className="text-sm text-zinc-300/70">
-                      Customize your interface.
-                    </p>
-                  </div>
-                </div>
-
-                <select
-                  value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
-                  className="h-12 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-white outline-none transition focus:border-pink-500/50"
-                >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                  <option value="auto">Auto</option>
-                </select>
-              </CardContent>
-            </Card>
-
-            {/* Export */}
-            <Card className="border border-white/10 bg-[#111118]/80 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+                        {/* Export */}
+            <Card className="border border-app panel-app text-app shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
               <CardContent className="p-7">
                 <div className="mb-8 flex items-center gap-4">
                   <div className="rounded-xl bg-green-500/10 p-3">
@@ -520,11 +424,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <h2 className="text-xl font-semibold text-white">
+                    <h2 className="text-xl font-semibold text-app">
                       Data Export
                     </h2>
 
-                    <p className="text-sm text-zinc-300/70">
+                    <p className="text-sm text-app-muted/70">
                       Download all your data.
                     </p>
                   </div>
@@ -544,7 +448,7 @@ export default function SettingsPage() {
             <Button
               onClick={logout}
               variant="outline"
-              className="h-12 w-full rounded-xl border-white/10 bg-[#111118]/80 text-white hover:bg-white/10"
+              className="h-12 w-full rounded-xl border-app panel-app text-app hover:bg-white/10"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Logout

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Task } from "@/types/task"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import { Plus, Calendar } from "lucide-react"
 import { v4 as uuid } from "uuid"
+import { formatDueLabel } from "@/lib/date"
 
 export function TasksList({
   tasks: initialTasks,
@@ -37,6 +38,24 @@ export function TasksList({
     }
 
     setTasks((prev) => [optimisticTask, ...prev])
+  }
+
+  async function updateDueDate(id: string, dueDate: string | null) {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id ? { ...task, due_date: dueDate } : task,
+      ),
+    )
+
+    const task = tasksRef.current.find((t) => t.id === id)
+    if (task?.isNew) return
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({ due_date: dueDate })
+      .eq("id", id)
+
+    if (error) toast.error("Failed to update due date")
   }
 
   async function toggleTask(
@@ -175,13 +194,13 @@ export function TasksList({
   return (
     <div className="space-y-3">
       <div className="mb-6 flex items-center justify-between">
-        <div className="text-sm uppercase tracking-[0.24em] text-zinc-500">
+        <div className="text-sm uppercase tracking-[0.24em] text-app-muted">
           Your tasks
         </div>
 
         <button
           onClick={createTask}
-          className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-medium text-black transition hover:opacity-90"
+          className="btn-primary-app flex items-center gap-2 px-4 py-3"
         >
           <Plus size={18} />
           Add Task
@@ -191,7 +210,7 @@ export function TasksList({
       {tasks.map((task) => (
         <div
           key={task.id}
-          className="flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-900 p-4"
+          className="flex items-center gap-4 rounded-2xl border border-app bg-app-surface p-4"
         >
           <input
             type="checkbox"
@@ -223,12 +242,33 @@ export function TasksList({
                 e.currentTarget.blur()
               }
             }}
-            className={`flex-1 bg-transparent outline-none placeholder:text-zinc-600 ${
+            className={`min-w-0 flex-1 bg-transparent outline-none placeholder:text-zinc-600 ${
               task.completed
-                ? "text-zinc-500 line-through"
+                ? "text-app-muted line-through"
                 : ""
             }`}
           />
+
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <input
+              type="date"
+              value={task.due_date?.slice(0, 10) ?? ""}
+              onChange={(e) =>
+                updateDueDate(
+                  task.id,
+                  e.target.value ? `${e.target.value}T12:00:00` : null,
+                )
+              }
+              className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
+              title="Due date"
+            />
+            {task.due_date && (
+              <span className="flex items-center gap-1 text-xs text-app-muted">
+                <Calendar className="h-3 w-3" />
+                {formatDueLabel(task.due_date)}
+              </span>
+            )}
+          </div>
 
           <button
             onClick={() =>
@@ -242,7 +282,7 @@ export function TasksList({
       ))}
 
       {tasks.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-zinc-500">
+        <div className="rounded-2xl border border-dashed border-app p-10 text-center text-app-muted">
           No tasks yet
         </div>
       )}

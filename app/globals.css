@@ -117,14 +117,134 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Home OS app shell — light/dark via .dark on html */
+:root {
+  --home-bg: #f4f4f5;
+  --home-surface: #ffffff;
+  --home-elevated: #fafafa;
+  --home-border: rgba(0, 0, 0, 0.08);
+  --home-text: #18181b;
+  --home-muted: #71717a;
+  --home-accent-glow: rgba(59, 130, 246, 0.08);
+}
+
+.dark {
+  --home-bg: #09090b;
+  --home-surface: #111118;
+  --home-elevated: #18181b;
+  --home-border: rgba(255, 255, 255, 0.1);
+  --home-text: #fafafa;
+  --home-muted: #a1a1aa;
+  --home-accent-glow: rgba(59, 130, 246, 0.1);
+}
+
+@layer utilities {
+  .bg-app {
+    background-color: var(--home-bg);
+  }
+  .bg-app-surface {
+    background-color: var(--home-surface);
+  }
+  .bg-app-elevated {
+    background-color: var(--home-elevated);
+  }
+  .text-app {
+    color: var(--home-text);
+  }
+  .text-app-muted {
+    color: var(--home-muted);
+  }
+  .border-app {
+    border-color: var(--home-border);
+  }
+  .hover\:bg-app-elevated:hover {
+    background-color: var(--home-elevated);
+  }
+  .hover\:text-app:hover {
+    color: var(--home-text);
+  }
+}
+
+@layer components {
+  .panel-app {
+    border-radius: 1.5rem;
+    border: 1px solid var(--home-border);
+    background-color: color-mix(in srgb, var(--home-surface) 92%, transparent);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .panel-app {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  .card-app {
+    border-radius: 1rem;
+    border: 1px solid var(--home-border);
+    background-color: var(--home-surface);
+  }
+
+  .item-app {
+    border-radius: 0.75rem;
+    border: 1px solid var(--home-border);
+    background-color: color-mix(in srgb, var(--home-elevated) 65%, transparent);
+    transition: background-color 0.15s ease;
+  }
+
+  .item-app:hover {
+    background-color: var(--home-elevated);
+  }
+
+  .input-app {
+    border-radius: 0.75rem;
+    border: 1px solid var(--home-border);
+    background-color: var(--home-elevated);
+    color: var(--home-text);
+  }
+
+  .input-app::placeholder {
+    color: var(--home-muted);
+  }
+
+  .btn-primary-app {
+    border-radius: 0.75rem;
+    background-color: var(--home-text);
+    color: var(--home-bg);
+    font-weight: 500;
+    transition: opacity 0.15s ease;
+  }
+
+  .btn-primary-app:hover {
+    opacity: 0.9;
+  }
+
+  .link-muted {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--home-muted);
+    transition: color 0.15s ease;
+  }
+
+  .link-muted:hover {
+    color: var(--home-text);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--home-bg);
+    color: var(--home-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-mono;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 }

@@ -24,8 +24,8 @@ export async function NotesSidebar({
   }
 
   return (
-    <div className="w-80 border-r border-white/10 bg-zinc-950">
-      <div className="flex items-center justify-between border-b border-white/10 p-4">
+    <div className="w-80 border-r border-app bg-app">
+      <div className="flex items-center justify-between border-b border-app p-4">
         <h1 className="text-lg font-semibold">
           Notes
         </h1>
@@ -39,7 +39,7 @@ export async function NotesSidebar({
 
       <div className="space-y-2 p-3">
         {notes.length === 0 && (
-          <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-zinc-500">
+          <div className="rounded-xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
             No notes yet
           </div>
         )}
@@ -54,15 +54,15 @@ export async function NotesSidebar({
               href={`/notes/${note.id}`}
               className={`block rounded-xl border p-4 transition ${
                 active
-                  ? "border-white/20 bg-zinc-800"
-                  : "border-white/5 bg-zinc-900 hover:border-white/10 hover:bg-zinc-800"
+                  ? "border-white/20 bg-app-elevated"
+                  : "border-app bg-app-surface hover:border-app hover:bg-app-elevated"
               }`}
             >
               <h2 className="truncate font-medium">
                 {note.title}
               </h2>
 
-              <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
+              <p className="mt-2 line-clamp-2 text-sm text-app-muted">
                 {note.content || "Empty note"}
               </p>
             </Link>

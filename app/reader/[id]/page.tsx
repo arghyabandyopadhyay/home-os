@@ -29,7 +29,7 @@ export default async function ReaderPage({
   const isPdf = book.file_type?.toLowerCase().includes("pdf");
 
   return (
-    <div className="h-screen bg-[#09090b] text-white">
+    <div className="h-screen bg-app text-app">
       {isPdf ? (
         <PdfReader url={signedUrlData?.signedUrl || ""} />
       ) : (

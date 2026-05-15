@@ -6,7 +6,8 @@ import { Note } from "@/types/note"
 import { toast } from "sonner"
 import { DeleteNoteButton } from "./delete-note-button"
 import { useRouter } from "next/navigation"
-import { deleteNote } from "@/lib/notes";
+import { PinNoteButton } from "@/components/dashboard/pinned-notes"
+import { NoteLinks } from "@/components/notes/note-links"
 
 export function NoteEditor({
   note,
@@ -80,16 +81,19 @@ export function NoteEditor({
   }, [title, content])
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-y-auto bg-zinc-950">
+    <div className="h-[calc(100vh-64px)] overflow-y-auto bg-app">
       <div className="mx-auto max-w-4xl p-10">
         <div className="mb-6 flex items-center justify-between">
-          <div className="text-sm text-zinc-500">
+          <div className="text-sm text-app-muted">
             {saving ? "Saving..." : "Saved"}
           </div>
-          <DeleteNoteButton
-    onDelete={deleteNote}
-  />
+          <div className="flex items-center gap-2">
+            <PinNoteButton noteId={note.id} />
+            <DeleteNoteButton onDelete={deleteNote} />
+          </div>
         </div>
+
+        <NoteLinks note={note} />
 
         <input
           value={title}
@@ -106,7 +110,7 @@ export function NoteEditor({
             setContent(e.target.value)
           }
           placeholder="Start writing..."
-          className="min-h-[500px] w-full resize-none bg-transparent text-lg leading-8 text-zinc-300 outline-none"
+          className="min-h-[500px] w-full resize-none bg-transparent text-lg leading-8 text-app-muted outline-none"
         />
       </div>
     </div>

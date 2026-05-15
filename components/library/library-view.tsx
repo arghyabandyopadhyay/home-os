@@ -268,7 +268,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
       <div className="mb-8 flex justify-end">
         <button
           onClick={createBook}
-          className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-medium text-black transition hover:opacity-90"
+          className="btn-primary-app flex items-center gap-2 px-4 py-3"
         >
           <Plus size={18} />
           Add Book
@@ -276,7 +276,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
       </div>
 
       {books.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-white/10 p-16 text-center text-zinc-500">
+        <div className="rounded-3xl border border-dashed border-app p-16 text-center text-app-muted">
           No books yet
         </div>
       )}
@@ -286,7 +286,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search books..."
-          className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 outline-none"
+          className="w-full rounded-2xl border border-app bg-app-surface px-4 py-3 outline-none"
         />
       </div>
 
@@ -295,17 +295,17 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
           <div
             key={book.id}
             className="
-  rounded-3xl
+  rounded-2xl
   border
-  border-white/10
-  bg-zinc-900
+  border-app
+  bg-app-surface
   p-4
   transition-all
   hover:-translate-y-1
-  hover:border-white/20
+  hover:border-blue-500/30
 "
           >
-            <div className="relative mb-4 aspect-3/4 overflow-hidden rounded-2xl bg-zinc-800">
+            <div className="relative mb-4 aspect-3/4 overflow-hidden rounded-2xl bg-app-elevated">
               {book.cover_url ? (
                 <Image
                   src={book.cover_url}
@@ -319,7 +319,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                   className="object-cover"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center bg-linear-to-br from-zinc-800 to-zinc-900 text-center text-sm text-zinc-500">
+                <div className="flex h-full items-center justify-center bg-app-elevated text-center text-sm text-app-muted">
                   <div className="px-4">{book.title || "Untitled"}</div>
                 </div>
               )}
@@ -346,7 +346,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                   author: e.target.value,
                 })
               }
-              className="mb-4 w-full bg-transparent text-sm text-zinc-400 outline-none"
+              className="mb-4 w-full bg-transparent text-sm text-app-muted outline-none"
             />
 
             <select
@@ -361,15 +361,15 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   w-full
   rounded-xl
   border
-  border-white/10
+  border-app
   p-2
   text-sm
   ${
     book.status === "finished"
-      ? "bg-emerald-950 text-emerald-300"
+      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
       : book.status === "reading"
-        ? "bg-blue-950 text-blue-300"
-        : "bg-zinc-950 text-zinc-300"
+        ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+        : "bg-app text-app-muted"
   }
 `}
             >
@@ -417,11 +417,11 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                   notes: e.target.value,
                 })
               }
-              className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-zinc-950 p-3 text-sm outline-none"
+              className="mt-4 w-full resize-none rounded-xl border border-app bg-app p-3 text-sm outline-none"
             />
 
             {book.description && (
-              <p className="mt-4 line-clamp-4 text-sm text-zinc-500">
+              <p className="mt-4 line-clamp-4 text-sm text-app-muted">
                 {book.description}
               </p>
             )}
@@ -432,7 +432,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                   href={book.preview_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl bg-white px-3 py-2 text-sm font-medium text-black"
+                  className="btn-primary-app px-3 py-2 text-sm"
                 >
                   Read Preview
                 </a>
@@ -443,7 +443,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                   href={book.info_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl border border-white/10 px-3 py-2 text-sm"
+                  className="rounded-xl border border-app px-3 py-2 text-sm"
                 >
                   Details
                 </a>
@@ -459,7 +459,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
             {book.file_path && (
               <Link
                 href={`/reader/${book.id}`}
-                className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-medium text-black"
+                className="btn-primary-app mt-4 inline-flex px-4 py-2 text-sm"
               >
                 Open Reader
               </Link>
@@ -467,7 +467,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
             <button
               onClick={() => deleteBook(book.id)}
-              className="text-sm text-red-400 transition hover:text-red-300"
+              className="mt-3 text-sm text-red-500 transition hover:text-red-600"
             >
               Delete
             </button>

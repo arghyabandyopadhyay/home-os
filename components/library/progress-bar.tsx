@@ -5,13 +5,13 @@ export function ProgressBar({
 }) {
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs text-zinc-500">
+      <div className="mb-1 flex justify-between text-xs text-app-muted">
         <span>Progress</span>
 
         <span>{value}%</span>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+      <div className="h-2 overflow-hidden rounded-full bg-app-elevated">
         <div
           style={{
             width: `${value}%`,

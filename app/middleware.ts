@@ -28,6 +28,7 @@ export async function middleware(request: NextRequest) {
 
   const protectedRoutes = [
     "/dashboard",
+    "/calendar",
     "/notes",
     "/tasks",
     "/library",
@@ -53,6 +54,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/calendar/:path*",
     "/notes/:path*",
     "/tasks/:path*",
     "/library/:path*",

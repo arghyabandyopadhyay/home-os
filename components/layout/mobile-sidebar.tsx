@@ -24,7 +24,7 @@ export function MobileSidebar() {
 
       <SheetContent
         side="left"
-        className="w-72 border-white/10 bg-zinc-950 p-0"
+        className="w-72 border-app bg-app p-0"
       >
         <Sidebar />
       </SheetContent>

@@ -9,11 +9,12 @@ import {
   Library,
   Users,
   Settings,
+  CalendarDays,
 } from "lucide-react";
 
 const items = [
   {
-    title: "Dashboard",
+    title: "Today",
     href: "/dashboard",
     icon: Home,
   },
@@ -26,6 +27,11 @@ const items = [
     title: "Tasks",
     href: "/tasks",
     icon: CheckSquare,
+  },
+  {
+    title: "Calendar",
+    href: "/calendar",
+    icon: CalendarDays,
   },
   {
     title: "Library",
@@ -48,10 +54,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-72 flex-col border-r border-white/10 bg-[#111118]">
-      <div className="border-b border-white/10 p-6">
-        <h1 className="text-2xl font-bold text-white">Home OS</h1>
-        <p className="mt-1 text-sm text-zinc-400">Your digital home</p>
+    <aside className="flex h-screen w-72 flex-col border-r border-app bg-app-surface">
+      <div className="border-b border-app p-6">
+        <h1 className="text-2xl font-bold text-app">Home OS</h1>
+        <p className="mt-1 text-sm text-app-muted">Mind · tasks · people · media</p>
       </div>
 
       <nav className="flex-1 space-y-2 p-4">
@@ -65,8 +71,8 @@ export function Sidebar() {
               href={item.href}
               className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-all ${
                 active
-                  ? "bg-white text-black"
-                  : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                  ? "bg-app-elevated text-app dark:bg-white dark:text-black"
+                  : "text-app-muted hover:bg-app-elevated hover:text-app"
               }`}
             >
               <Icon size={18} />

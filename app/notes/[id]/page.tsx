@@ -13,8 +13,8 @@ export default async function NotePage({
 
   if (!note) {
     return (
-      <div className="relative min-h-screen bg-[#09090b] text-white flex items-center justify-center p-10">
-        <div className="rounded-3xl border border-white/10 bg-[#111118]/80 p-10 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+      <div className="relative min-h-screen bg-app text-app flex items-center justify-center p-10">
+        <div className="rounded-3xl border border-app panel-app p-10 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
           Note not found
         </div>
       </div>
@@ -22,12 +22,12 @@ export default async function NotePage({
   }
 
   return (
-    <div className="relative min-h-screen bg-[#09090b] text-white">
+    <div className="relative min-h-screen bg-app text-app">
       <div className="flex h-[calc(100vh-64px)]">
         <NotesSidebar notes={notes} activeNoteId={id} />
 
         <div className="flex-1 px-6 py-10">
-          <div className="rounded-3xl border border-white/10 bg-[#111118]/80 p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+          <div className="rounded-3xl border border-app panel-app p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
             <NoteEditor note={note} />
           </div>
         </div>

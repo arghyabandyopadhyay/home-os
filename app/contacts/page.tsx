@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ContactsView } from "@/components/contacts/contacts-view";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -16,12 +17,8 @@ export default async function ContactsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="relative min-h-screen bg-[#09090b] text-white">
-      <div className="relative mx-auto max-w-6xl px-6 py-10">
-        <div className="rounded-3xl border border-white/10 bg-[#111118]/80 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-          <ContactsView initialContacts={contacts || []} />
-        </div>
-      </div>
-    </div>
+    <PageShell title="Contacts" description="People that matter to you">
+      <ContactsView initialContacts={contacts || []} />
+    </PageShell>
   );
 }
