@@ -14,11 +14,264 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          all_day: boolean
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          external_calendar_id: string | null
+          external_id: string | null
+          html_link: string | null
+          id: string
+          location: string | null
+          source: string
+          starts_at: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          external_calendar_id?: string | null
+          external_id?: string | null
+          html_link?: string | null
+          id?: string
+          location?: string | null
+          source?: string
+          starts_at: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          external_calendar_id?: string | null
+          external_id?: string | null
+          html_link?: string | null
+          id?: string
+          location?: string | null
+          source?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_connections: {
+        Row: {
+          access_token: string
+          calendar_id: string
+          connected_email: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          provider: string
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string
+          connected_email?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider: string
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string
+          connected_email?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          favorite: boolean
+          google_contact_id: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          favorite?: boolean
+          google_contact_id?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          source?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          favorite?: boolean
+          google_contact_id?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_size: number | null
+          id: string
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_contacts_connections: {
+        Row: {
+          access_token: string
+          connected_email: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          connected_email?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          connected_email?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_contacts_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           content: string | null
           created_at: string | null
           id: string
+          linked_book_id: string | null
+          linked_contact_id: string | null
+          tags: string[]
           title: string
           updated_at: string | null
           user_id: string | null
@@ -27,6 +280,9 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           id?: string
+          linked_book_id?: string | null
+          linked_contact_id?: string | null
+          tags?: string[]
           title: string
           updated_at?: string | null
           user_id?: string | null
@@ -35,6 +291,9 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           id?: string
+          linked_book_id?: string | null
+          linked_contact_id?: string | null
+          tags?: string[]
           title?: string
           updated_at?: string | null
           user_id?: string | null
@@ -73,7 +332,9 @@ export type Database = {
           created_at: string | null
           due_date: string | null
           id: string
+          priority: 'low' | 'medium' | 'high' | null
           title: string
+          updated_at: string
           user_id: string | null
         }
         Insert: {
@@ -81,7 +342,9 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           id?: string
+          priority?: 'low' | 'medium' | 'high' | null
           title: string
+          updated_at?: string
           user_id?: string | null
         }
         Update: {
@@ -89,7 +352,9 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           id?: string
+          priority?: 'low' | 'medium' | 'high' | null
           title?: string
+          updated_at?: string
           user_id?: string | null
         }
         Relationships: [

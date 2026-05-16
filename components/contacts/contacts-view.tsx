@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { ContactDetail } from "@/components/contacts/contact-detail";
 
 interface Props {
   initialContacts: Contact[];
@@ -36,6 +37,8 @@ export function ContactsView({ initialContacts }: Props) {
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
 
   const [search, setSearch] = useState("");
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
@@ -44,6 +47,7 @@ export function ContactsView({ initialContacts }: Props) {
       return (
         contact.name.toLowerCase().includes(query) ||
         contact.email?.toLowerCase().includes(query) ||
+        contact.phone?.toLowerCase().includes(query) ||
         contact.company?.toLowerCase().includes(query) ||
         contact.role?.toLowerCase().includes(query)
       );
@@ -217,7 +221,12 @@ export function ContactsView({ initialContacts }: Props) {
         {filteredContacts.map((contact) => (
           <Card
             key={contact.id}
+            onClick={() => {
+              setSelectedContact(contact);
+              setDetailOpen(true);
+            }}
             className="
+              cursor-pointer
               rounded-3xl
               border
               border-app
@@ -240,6 +249,7 @@ export function ContactsView({ initialContacts }: Props) {
                   <div className="space-y-1">
                     <Input
                       value={contact.name}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) =>
                         handleUpdate(contact.id, {
                           name: e.target.value,
@@ -268,7 +278,10 @@ export function ContactsView({ initialContacts }: Props) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => createFollowUpTask(contact)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      createFollowUpTask(contact);
+                    }}
                     className="rounded-lg border border-app p-2 text-app-muted transition hover:border-white/20 hover:text-app"
                     title="Add follow-up task for today"
                   >
@@ -276,11 +289,12 @@ export function ContactsView({ initialContacts }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       handleUpdate(contact.id, {
                         favorite: !contact.favorite,
-                      })
-                    }
+                      });
+                    }}
                   >
                     <Star
                       className={`h-5 w-5 transition-colors ${
@@ -294,7 +308,7 @@ export function ContactsView({ initialContacts }: Props) {
               </div>
 
               {/* Info Fields */}
-              <div className="space-y-4">
+              <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                 {/* Email */}
                 <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2">
                   <Mail className="h-4 w-4 text-app-muted" />
@@ -399,6 +413,7 @@ export function ContactsView({ initialContacts }: Props) {
               {/* Notes */}
               <Textarea
                 value={contact.notes || ""}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) =>
                   handleUpdate(contact.id, {
                     notes: e.target.value,
@@ -428,7 +443,10 @@ export function ContactsView({ initialContacts }: Props) {
                   hover:bg-red-500/10
                   hover:text-red-300
                 "
-                onClick={() => handleDelete(contact.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(contact.id);
+                }}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
@@ -437,6 +455,24 @@ export function ContactsView({ initialContacts }: Props) {
           </Card>
         ))}
       </div>
+
+      {/* Contact Detail Sheet */}
+      <ContactDetail
+        contact={selectedContact}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onUpdate={(id, updates) => {
+          handleUpdate(id, updates);
+          // Update the selected contact in the sheet as well
+          setSelectedContact((prev) =>
+            prev && prev.id === id ? { ...prev, ...updates } : prev,
+          );
+        }}
+        onDelete={(id) => {
+          handleDelete(id);
+          setDetailOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   CalendarDays,
+  FileText,
 } from "lucide-react";
 
 const items = [
@@ -37,6 +38,11 @@ const items = [
     title: "Library",
     href: "/library",
     icon: Library,
+  },
+  {
+    title: "Documents",
+    href: "/documents",
+    icon: FileText,
   },
   {
     title: "Contacts",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchUserPreferences,
@@ -9,77 +9,73 @@ import {
 import { applyTheme } from "@/lib/theme";
 import type { UserPreferences } from "@/types/user-preferences";
 import { defaultUserPreferences } from "@/types/user-preferences";
+import { readLocalCache, writeLocalCache } from "@/lib/preferences-cache";
 
-const LOCAL_PREFS_KEY = "home-os:preferences-cache";
-
-function readLocalCache(): UserPreferences | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_PREFS_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as UserPreferences;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalCache(prefs: UserPreferences) {
-  localStorage.setItem(LOCAL_PREFS_KEY, JSON.stringify(prefs));
-}
+// Module-level stable client reference — createBrowserClient already returns a singleton internally
+const supabase = createClient();
 
 export function useUserPreferences() {
-  const [prefs, setPrefs] = useState<UserPreferences>(
-    defaultUserPreferences,
-  );
+  const [prefs, setPrefs] = useState<UserPreferences>(() => {
+    return readLocalCache() ?? defaultUserPreferences;
+  });
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const supabase = createClient();
+  const hasFetched = useRef(false);
+  // Refs for stable update closure — avoids stale captures and dependency churn
+  const prefsRef = useRef(prefs);
+  const userIdRef = useRef(userId);
+  prefsRef.current = prefs;
+  userIdRef.current = userId;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        const cached = readLocalCache();
-        if (cached) setPrefs(cached);
         setUserId(null);
         return;
       }
 
       setUserId(user.id);
       const remote = await fetchUserPreferences(supabase, user.id);
-      setPrefs(remote);
-      writeLocalCache(remote);
-      if (remote.theme) applyTheme(remote.theme);
-    } catch {
-      const cached = readLocalCache();
-      if (cached) {
-        setPrefs(cached);
-        if (cached.theme) applyTheme(cached.theme);
+      // Merge: don't let remote defaults downgrade onboardingComplete from cache
+      const cached = prefsRef.current;
+      const merged: UserPreferences = {
+        ...remote,
+        onboardingComplete: remote.onboardingComplete || cached.onboardingComplete,
+      };
+      setPrefs(merged);
+      writeLocalCache(merged);
+      // If cache had onboardingComplete but remote didn't, sync it up
+      if (cached.onboardingComplete && !remote.onboardingComplete) {
+        saveUserPreferences(supabase, user.id, { onboardingComplete: true }).catch(() => {
+          // Best-effort sync — don't block
+        });
       }
+    } catch {
+      console.warn("[preferences] Remote fetch failed, using cached/default values");
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    void load();
   }, [load]);
 
   const update = useCallback(
     async (patch: Partial<UserPreferences>) => {
+      const current = prefsRef.current;
       const optimistic: UserPreferences = {
-        ...prefs,
+        ...current,
         ...patch,
         notifications: {
           ...defaultUserPreferences.notifications!,
-          ...prefs.notifications,
+          ...current.notifications,
           ...patch.notifications,
         },
       };
@@ -87,18 +83,33 @@ export function useUserPreferences() {
       writeLocalCache(optimistic);
       if (patch.theme) applyTheme(patch.theme);
 
-      if (!userId) return optimistic;
+      // Get userId — if not yet available, fetch it now
+      let uid = userIdRef.current;
+      if (!uid) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            uid = user.id;
+            setUserId(uid);
+          }
+        } catch {
+          // Can't get user — skip remote save
+        }
+      }
+
+      if (!uid) return optimistic;
 
       try {
-        const saved = await saveUserPreferences(supabase, userId, patch);
+        const saved = await saveUserPreferences(supabase, uid, patch);
         setPrefs(saved);
         writeLocalCache(saved);
         return saved;
       } catch {
+        console.warn("[preferences] Remote write failed, keeping optimistic state");
         return optimistic;
       }
     },
-    [prefs, supabase, userId],
+    [], // Stable — uses refs for current values
   );
 
   return { prefs, loading, update, reload: load };

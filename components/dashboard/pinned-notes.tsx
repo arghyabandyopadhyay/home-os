@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Pin, PinOff } from "lucide-react";
 import { usePreferences } from "@/components/providers/user-preferences-provider";
+import { toast } from "sonner";
 import type { Note } from "@/types/note";
 
 export function PinnedNotes({ notes }: { notes: Note[] }) {
@@ -61,10 +62,17 @@ export function PinNoteButton({ noteId }: { noteId: string }) {
   const pinned = pinnedIds.includes(noteId);
 
   async function toggle() {
-    const next = pinned
-      ? pinnedIds.filter((id) => id !== noteId)
-      : [noteId, ...pinnedIds].slice(0, 5);
-    await update({ pinnedNoteIds: next });
+    if (pinned) {
+      const next = pinnedIds.filter((id) => id !== noteId);
+      await update({ pinnedNoteIds: next });
+    } else {
+      if (pinnedIds.length >= 10) {
+        toast.info("You can pin up to 10 notes. Unpin one to make room.");
+        return;
+      }
+      const next = [noteId, ...pinnedIds].slice(0, 10);
+      await update({ pinnedNoteIds: next });
+    }
   }
 
   return (

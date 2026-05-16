@@ -21,10 +21,13 @@ import {
   CalendarDays,
   Plus,
   Settings,
+  File,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Book } from "@/types/book";
+import type { CalendarEvent } from "@/types/calendar";
 import type { Contact } from "@/types/contact";
+import type { Document } from "@/types/document";
 import type { Note } from "@/types/note";
 import type { Task } from "@/types/task";
 
@@ -33,6 +36,8 @@ export function CommandMenu() {
   const [search, setSearch] = React.useState("");
   const [books, setBooks] = React.useState<Book[]>([]);
   const [contacts, setContacts] = React.useState<Contact[]>([]);
+  const [documents, setDocuments] = React.useState<Document[]>([]);
+  const [events, setEvents] = React.useState<CalendarEvent[]>([]);
   const [notes, setNotes] = React.useState<Note[]>([]);
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -44,6 +49,8 @@ export function CommandMenu() {
     setSearch("");
     setBooks([]);
     setContacts([]);
+    setDocuments([]);
+    setEvents([]);
     setNotes([]);
     setTasks([]);
   }, []);
@@ -86,6 +93,8 @@ export function CommandMenu() {
         if (!q) {
           setBooks([]);
           setContacts([]);
+          setDocuments([]);
+          setEvents([]);
           setNotes([]);
           setTasks([]);
           return;
@@ -93,7 +102,7 @@ export function CommandMenu() {
 
         const pattern = `%${q}%`;
 
-        const [booksRes, contactsRes, notesRes, tasksRes] = await Promise.all([
+        const [booksRes, contactsRes, documentsRes, eventsRes, notesRes, tasksRes] = await Promise.all([
           supabase
             .from("books")
             .select("*")
@@ -107,6 +116,18 @@ export function CommandMenu() {
             .or(
               `name.ilike.${pattern},email.ilike.${pattern},company.ilike.${pattern}`,
             )
+            .limit(5),
+          supabase
+            .from("documents")
+            .select("*")
+            .eq("user_id", user.id)
+            .ilike("title", pattern)
+            .limit(5),
+          supabase
+            .from("calendar_events")
+            .select("*")
+            .eq("user_id", user.id)
+            .ilike("title", pattern)
             .limit(5),
           supabase
             .from("notes")
@@ -124,6 +145,8 @@ export function CommandMenu() {
 
         setBooks(booksRes.data || []);
         setContacts(contactsRes.data || []);
+        setDocuments(documentsRes.data || []);
+        setEvents(eventsRes.data || []);
         setNotes(notesRes.data || []);
         setTasks(tasksRes.data || []);
       } catch (error) {
@@ -192,6 +215,8 @@ export function CommandMenu() {
   const hasSearchResults =
     books.length > 0 ||
     contacts.length > 0 ||
+    documents.length > 0 ||
+    events.length > 0 ||
     notes.length > 0 ||
     tasks.length > 0;
 
@@ -266,6 +291,13 @@ export function CommandMenu() {
               >
                 <BookOpen className="mr-2 h-4 w-4" />
                 Library
+              </CommandItem>
+              <CommandItem
+                onSelect={() => handleSelect("/documents")}
+                className="cursor-pointer"
+              >
+                <File className="mr-2 h-4 w-4" />
+                Documents
               </CommandItem>
               <CommandItem
                 onSelect={() => handleSelect("/contacts")}
@@ -355,6 +387,48 @@ export function CommandMenu() {
                       <span className="text-xs text-muted-foreground">
                         {contact.email || contact.company}
                       </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {events.length > 0 && (
+              <CommandGroup heading="Events">
+                {events.map((event) => (
+                  <CommandItem
+                    key={event.id}
+                    onSelect={() => handleSelect("/calendar")}
+                    className="cursor-pointer"
+                  >
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span>{event.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(event.starts_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {documents.length > 0 && (
+              <CommandGroup heading="Documents">
+                {documents.map((doc) => (
+                  <CommandItem
+                    key={doc.id}
+                    onSelect={() => handleSelect(`/documents/${doc.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <File className="mr-2 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span>{doc.title}</span>
+                      {doc.tags.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {doc.tags.join(", ")}
+                        </span>
+                      )}
                     </div>
                   </CommandItem>
                 ))}

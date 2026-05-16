@@ -10,6 +10,7 @@ export type CalendarEvent = {
   external_calendar_id: string | null;
   html_link: string | null;
   location: string | null;
+  description: string | null;
   created_at: string;
   updated_at: string;
 };

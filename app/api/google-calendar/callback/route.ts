@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   exchangeGoogleCalendarCode,
+  fetchGoogleUserEmail,
   saveGoogleCalendarConnection,
   syncGoogleCalendarEvents,
 } from "@/lib/google-calendar";
@@ -37,7 +38,25 @@ export async function GET(request: Request) {
       code,
       requestUrl: request.url,
     });
-    await saveGoogleCalendarConnection({ supabase, userId: user.id, token });
+
+    // Verify the calendar scope was actually granted
+    const grantedScopes = token.scope || "";
+    if (!grantedScopes.includes("calendar")) {
+      console.error(
+        "Google Calendar callback failed: Request had insufficient authentication scopes.",
+        `Granted: ${grantedScopes}`,
+      );
+      return NextResponse.redirect(
+        new URL("/dashboard?calendar=insufficient_scopes", request.url),
+      );
+    }
+
+    const email = await fetchGoogleUserEmail(token.access_token!);
+    if (email === null) {
+      console.warn("Could not fetch Google user email");
+    }
+
+    await saveGoogleCalendarConnection({ supabase, userId: user.id, token, connectedEmail: email });
     await syncGoogleCalendarEvents({
       supabase,
       userId: user.id,
@@ -48,7 +67,10 @@ export async function GET(request: Request) {
       new URL("/dashboard?calendar=connected", request.url),
     );
   } catch (error) {
-    console.error("Google Calendar callback:", error);
+    console.error(
+      "Google Calendar callback failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
     return NextResponse.redirect(
       new URL("/dashboard?calendar=sync_error", request.url),
     );

@@ -2,6 +2,17 @@
 
 import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export function DeleteNoteButton({
   onDelete,
@@ -9,23 +20,34 @@ export function DeleteNoteButton({
   onDelete: () => Promise<void>
 }) {
   async function handleDelete() {
-    const confirmed = confirm(
-      "Delete this note?"
-    )
-
-    if (!confirmed) return
-
     await onDelete()
-
     toast.success("Note deleted")
   }
 
   return (
-    <button
-      onClick={handleDelete}
-      className="rounded-lg border border-app p-2 text-app-muted transition hover:bg-app-elevated hover:text-app"
-    >
-      <Trash2 size={16} />
-    </button>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          className="rounded-lg border border-app p-2 text-app-muted transition hover:bg-app-elevated hover:text-app"
+          aria-label="Delete note"
+        >
+          <Trash2 size={16} />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. The note will be permanently removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={handleDelete}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

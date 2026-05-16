@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server"
 
+// Re-export pure functions from notes-utils (safe for client components)
+export {
+  truncatePreview,
+  filterNotesByQuery,
+  filterNotesByTag,
+  sortNotesByPin,
+  capPinnedNotes,
+} from "@/lib/notes-utils"
+
+// --- Server functions ---
+
 export async function getNotes() {
   const supabase = await createClient()
 

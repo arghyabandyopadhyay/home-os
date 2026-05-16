@@ -1,7 +1,17 @@
+"use client"
+
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { redirect } from "next/navigation"
-import { Plus } from "lucide-react"
-import { createNote } from "@/lib/notes"
+import { Plus, Search, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import {
+  truncatePreview,
+  filterNotesByQuery,
+  filterNotesByTag,
+  sortNotesByPin,
+} from "@/lib/notes-utils"
+import { usePreferences } from "@/components/providers/user-preferences-provider"
 import type { Note } from "@/types/note"
 
 interface NotesSidebarProps {
@@ -9,44 +19,147 @@ interface NotesSidebarProps {
   activeNoteId?: string
 }
 
-export async function NotesSidebar({
+export function NotesSidebar({
   notes,
   activeNoteId,
 }: NotesSidebarProps) {
-  async function create() {
-    "use server"
+  const router = useRouter()
+  const supabase = createClient()
+  const { prefs } = usePreferences()
+  const pinnedIds = prefs.pinnedNoteIds ?? []
 
-    const note = await createNote()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    if (!note) return
+  // 300ms debounce for search
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [searchQuery])
 
-    redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/notes/${note.id}`)
+  // Collect all unique tags from notes
+  const allTags = Array.from(
+    new Set(notes.flatMap((n) => n.tags))
+  ).sort()
+
+  // Apply filters
+  let filteredNotes = notes
+  if (debouncedQuery.trim().length >= 2) {
+    filteredNotes = filterNotesByQuery(filteredNotes, debouncedQuery)
+  }
+  if (activeTag) {
+    filteredNotes = filterNotesByTag(filteredNotes, activeTag)
+  }
+
+  // Sort pinned to top
+  filteredNotes = sortNotesByPin(filteredNotes, pinnedIds)
+
+  async function handleCreate() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data, error } = await supabase
+      .from("notes")
+      .insert({
+        user_id: user.id,
+        title: "Untitled",
+        content: "",
+      })
+      .select()
+      .single()
+
+    if (error || !data) return
+
+    router.push(`/notes/${data.id}`)
+    router.refresh()
   }
 
   return (
     <div className="w-80 border-r border-app bg-app">
       <div className="flex items-center justify-between border-b border-app p-4">
-        <h1 className="text-lg font-semibold">
-          Notes
-        </h1>
-
-        <form action={create}>
-          <button className="rounded-lg bg-white p-2 text-black transition hover:opacity-90">
-            <Plus size={16} />
-          </button>
-        </form>
+        <h1 className="text-lg font-semibold">Notes</h1>
+        <button
+          onClick={handleCreate}
+          className="rounded-lg bg-white p-2 text-black transition hover:opacity-90"
+          aria-label="Create new note"
+        >
+          <Plus size={16} />
+        </button>
       </div>
 
-      <div className="space-y-2 p-3">
-        {notes.length === 0 && (
+      {/* Search input */}
+      <div className="border-b border-app p-3">
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-app-muted"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search notes..."
+            className="input-app w-full pl-8 pr-8 text-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-app-muted hover:text-app"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tag filter chips */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-app p-3">
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() =>
+                setActiveTag(activeTag === tag ? null : tag)
+              }
+              className={`rounded-lg px-2 py-0.5 text-xs transition ${
+                activeTag === tag
+                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-200"
+                  : "bg-app-elevated text-app-muted hover:text-app"
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Notes list */}
+      <div className="space-y-2 overflow-y-auto p-3">
+        {filteredNotes.length === 0 && (
           <div className="rounded-xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
-            No notes yet
+            {debouncedQuery.trim().length >= 2 || activeTag
+              ? "No notes match your search"
+              : "No notes yet"}
           </div>
         )}
 
-        {notes.map((note) => {
-          const active =
-            note.id === activeNoteId
+        {filteredNotes.map((note) => {
+          const active = note.id === activeNoteId
+          const isPinned = pinnedIds.includes(note.id)
 
           return (
             <Link
@@ -58,13 +171,31 @@ export async function NotesSidebar({
                   : "border-app bg-app-surface hover:border-app hover:bg-app-elevated"
               }`}
             >
-              <h2 className="truncate font-medium">
-                {note.title}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="truncate font-medium">
+                  {note.title}
+                </h2>
+                {isPinned && (
+                  <span className="text-xs text-amber-500">●</span>
+                )}
+              </div>
 
-              <p className="mt-2 line-clamp-2 text-sm text-app-muted">
-                {note.content || "Empty note"}
+              <p className="mt-2 text-sm text-app-muted">
+                {truncatePreview(note.content, 120) || "Empty note"}
               </p>
+
+              {note.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {note.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-md bg-app-elevated px-1.5 py-0.5 text-xs text-app-muted"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </Link>
           )
         })}

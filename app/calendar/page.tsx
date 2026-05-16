@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { CalendarDays } from "lucide-react";
-import { TodayCalendar } from "@/components/dashboard/today-calendar";
-import { getGoogleCalendarStatus, getTodayEvents } from "@/lib/calendar";
+import { getMonthEvents, getGoogleCalendarStatus } from "@/lib/calendar";
+import { getTasks } from "@/lib/tasks";
 import { createClient } from "@/lib/supabase/server";
+import { CalendarView } from "@/components/calendar/calendar-view";
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -14,14 +15,16 @@ export default async function CalendarPage() {
     redirect("/login");
   }
 
-  const [events, googleCalendarConnected] = await Promise.all([
-    getTodayEvents(),
+  const now = new Date();
+  const [events, tasks, googleCalendarConnected] = await Promise.all([
+    getMonthEvents(now.getFullYear(), now.getMonth()),
+    getTasks(),
     getGoogleCalendarStatus(),
   ]);
 
   return (
     <div className="min-h-screen bg-app text-app">
-      <div className="mx-auto max-w-5xl space-y-6 px-6 py-10">
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-10">
         <header className="panel-app p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-500/10">
@@ -30,15 +33,18 @@ export default async function CalendarPage() {
             <div>
               <p className="text-sm text-app-muted">Calendar</p>
               <h1 className="text-3xl font-semibold tracking-tight">
-                Today&apos;s schedule
+                Schedule
               </h1>
             </div>
           </div>
         </header>
 
-        <TodayCalendar
+        <CalendarView
           initialEvents={events}
+          initialTasks={tasks}
           googleCalendarConnected={googleCalendarConnected}
+          initialYear={now.getFullYear()}
+          initialMonth={now.getMonth()}
         />
       </div>
     </div>

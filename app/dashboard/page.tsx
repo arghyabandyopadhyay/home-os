@@ -48,7 +48,7 @@ export default async function DashboardPage() {
 
         <QuickCapture />
 
-        <PinnedNotes notes={data.recentNotes} />
+        <PinnedNotes notes={data.pinnedNotes} />
 
         <div className="grid gap-6 lg:grid-cols-3">
 

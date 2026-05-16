@@ -50,7 +50,7 @@ export function togglePinnedNote(id: string): string[] {
   const current = getPinnedNoteIds();
   const next = current.includes(id)
     ? current.filter((noteId) => noteId !== id)
-    : [id, ...current].slice(0, 5);
+    : [id, ...current].slice(0, 10);
   setPinnedNoteIds(next);
   return next;
 }

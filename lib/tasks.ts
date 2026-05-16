@@ -1,5 +1,15 @@
 import { createClient } from "@/lib/supabase/server"
 
+// Re-export pure helpers so existing server-side imports still work
+export {
+  groupTasksBySection,
+  filterTodayTasks,
+  countTodayIncomplete,
+} from "@/lib/tasks-helpers"
+export type { TaskSections } from "@/lib/tasks-helpers"
+
+// ─── Server data access ───────────────────────────────────────────────────────
+
 export async function getTasks() {
   const supabase = await createClient()
 

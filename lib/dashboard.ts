@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { toDateKey } from "@/lib/date";
+import { fetchUserPreferences } from "@/lib/user-settings";
 import type { Book } from "@/types/book";
 import type { Contact } from "@/types/contact";
 import type { Note } from "@/types/note";
@@ -10,6 +11,7 @@ export type TodayData = {
   email: string;
   focusTasks: Task[];
   readingBooks: Book[];
+  pinnedNotes: Note[];
   recentNotes: Note[];
   favoriteContacts: Contact[];
   counts: {
@@ -34,10 +36,13 @@ export async function getTodayData(): Promise<TodayData | null> {
     user.email?.split("@")[0] ||
     "there";
 
+  // Fetch user preferences to get pinnedNoteIds
+  const prefs = await fetchUserPreferences(supabase, user.id);
+  const pinnedNoteIds = prefs.pinnedNoteIds ?? [];
+
   const [
     focusTasksRes,
     readingRes,
-    notesRes,
     contactsRes,
     openTasksCountRes,
     notesCountRes,
@@ -60,12 +65,6 @@ export async function getTodayData(): Promise<TodayData | null> {
       .eq("status", "reading")
       .order("updated_at", { ascending: false })
       .limit(3),
-    supabase
-      .from("notes")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-      .limit(6),
     supabase
       .from("contacts")
       .select("*")
@@ -93,6 +92,44 @@ export async function getTodayData(): Promise<TodayData | null> {
       .eq("user_id", user.id),
   ]);
 
+  // Fetch pinned notes by IDs, or fall back to 6 most recently updated notes
+  let pinnedNotes: Note[] = [];
+  if (pinnedNoteIds.length > 0) {
+    // Fetch notes matching pinned IDs (up to 6 for dashboard display)
+    const displayIds = pinnedNoteIds.slice(0, 6);
+    const { data: pinnedData } = await supabase
+      .from("notes")
+      .select("*")
+      .eq("user_id", user.id)
+      .in("id", displayIds);
+
+    // Preserve the pinned order from preferences
+    const noteMap = new Map((pinnedData || []).map((n) => [n.id, n]));
+    pinnedNotes = displayIds
+      .map((id) => noteMap.get(id))
+      .filter((n): n is Note => n != null);
+  } else {
+    // Fall back to 6 most recently updated notes
+    const { data: recentData } = await supabase
+      .from("notes")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(6);
+
+    pinnedNotes = (recentData || []) as Note[];
+  }
+
+  // Always fetch recent notes for the "Recent notes" section
+  const { data: recentNotesData } = await supabase
+    .from("notes")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(6);
+
+  const recentNotes = (recentNotesData || []) as Note[];
+
   const focusTasks = (focusTasksRes.data || []) as Task[];
 
   if (focusTasks.length < 5) {
@@ -116,7 +153,8 @@ export async function getTodayData(): Promise<TodayData | null> {
     email: user.email || "",
     focusTasks: focusTasks.slice(0, 8),
     readingBooks: (readingRes.data || []) as Book[],
-    recentNotes: (notesRes.data || []) as Note[],
+    pinnedNotes,
+    recentNotes,
     favoriteContacts: (contactsRes.data || []) as Contact[],
     counts: {
       openTasks: openTasksCountRes.count ?? 0,

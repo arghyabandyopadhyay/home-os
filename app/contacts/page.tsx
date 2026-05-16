@@ -14,7 +14,7 @@ export default async function ContactsPage() {
     .select("*")
     .eq("user_id", user?.id)
     .order("favorite", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("name", { ascending: true });
 
   return (
     <PageShell title="Contacts" description="People that matter to you">

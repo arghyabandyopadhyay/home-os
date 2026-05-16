@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CalendarEvent } from "@/types/calendar";
 
 const GOOGLE_CALENDAR_SCOPE =
-  "https://www.googleapis.com/auth/calendar.events.readonly";
+  "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/userinfo.email";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_EVENTS_URL =
   "https://www.googleapis.com/calendar/v3/calendars/primary/events";
@@ -63,6 +62,48 @@ type SyncedCalendarEventRow = {
   location: string | null;
   updated_at: string;
 };
+
+// Custom error classes for structured error handling
+export class ReconnectRequiredError extends Error {
+  constructor(message?: string) {
+    super(message || "Google Calendar reconnection required");
+    this.name = "ReconnectRequiredError";
+  }
+}
+
+export class GoogleApiError extends Error {
+  public statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = "GoogleApiError";
+    this.statusCode = statusCode;
+  }
+}
+
+// Fetch the authenticated user's email from Google
+export async function fetchGoogleUserEmail(
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as { email?: string };
+    return data.email || null;
+  } catch {
+    return null;
+  }
+}
 
 export function getGoogleCalendarScope() {
   return GOOGLE_CALENDAR_SCOPE;
@@ -134,10 +175,12 @@ export async function saveGoogleCalendarConnection({
   supabase,
   userId,
   token,
+  connectedEmail,
 }: {
   supabase: SupabaseClient;
   userId: string;
   token: GoogleTokenResponse;
+  connectedEmail?: string | null;
 }) {
   const { data: existing } = await supabase
     .from("calendar_connections")
@@ -160,6 +203,7 @@ export async function saveGoogleCalendarConnection({
       refresh_token: token.refresh_token || existing?.refresh_token || null,
       expires_at: expiresAt,
       scope: token.scope || GOOGLE_CALENDAR_SCOPE,
+      connected_email: connectedEmail ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,provider,calendar_id" },
@@ -211,7 +255,7 @@ async function refreshConnectionToken({
   requestUrl: string;
 }) {
   if (!connection.refresh_token) {
-    throw new Error("Reconnect Google Calendar to refresh access");
+    throw new ReconnectRequiredError("Missing refresh token");
   }
 
   const { clientId, clientSecret } = getGoogleOAuthConfig(requestUrl);
@@ -236,7 +280,7 @@ async function refreshConnectionToken({
 
   const token = (await response.json()) as GoogleTokenResponse;
   if (!response.ok || token.error || !token.access_token) {
-    throw new Error(token.error_description || "Could not refresh Google token");
+    throw new ReconnectRequiredError("Refresh token revoked or invalid");
   }
 
   const expiresAt = token.expires_in
@@ -291,27 +335,40 @@ function googleDateToIso(date?: GoogleCalendarDate) {
   return null;
 }
 
+export function getSyncBounds(monthsAhead: number = 3): { timeMin: string; timeMax: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1 + monthsAhead, 0, 23, 59, 59);
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  };
+}
+
 export async function syncGoogleCalendarEvents({
   supabase,
   userId,
   requestUrl,
+  timeRange,
 }: {
   supabase: SupabaseClient;
   userId: string;
   requestUrl: string;
-}): Promise<CalendarEvent[]> {
+  timeRange?: { timeMin: string; timeMax: string };
+}): Promise<{ synced: number }> {
   const connection = await getUsableConnection({ supabase, userId, requestUrl });
   if (!connection) {
-    throw new Error("Google Calendar is not connected");
+    throw new Error("not_connected");
   }
 
-  const { timeMin, timeMax } = getTodayBounds();
+  const { timeMin, timeMax } = timeRange || getSyncBounds();
   const url = new URL(GOOGLE_EVENTS_URL);
   url.searchParams.set("timeMin", timeMin);
   url.searchParams.set("timeMax", timeMax);
   url.searchParams.set("singleEvents", "true");
   url.searchParams.set("orderBy", "startTime");
-  url.searchParams.set("maxResults", "50");
+  url.searchParams.set("maxResults", "250");
 
   const response = await fetch(url, {
     headers: {
@@ -320,10 +377,16 @@ export async function syncGoogleCalendarEvents({
     },
   });
 
-  const payload = (await response.json()) as GoogleEventsResponse;
   if (!response.ok) {
-    throw new Error(payload.error?.message || "Could not sync Google Calendar");
+    if (response.status === 401) {
+      throw new ReconnectRequiredError("Google Calendar returned 401");
+    }
+    const payload = (await response.json()) as GoogleEventsResponse;
+    const message = payload.error?.message || `Google Calendar API error (${response.status})`;
+    throw new GoogleApiError(response.status, message);
   }
+
+  const payload = (await response.json()) as GoogleEventsResponse;
 
   const rows = (payload.items || [])
     .map((event) => {
@@ -354,14 +417,5 @@ export async function syncGoogleCalendarEvents({
     if (error) throw error;
   }
 
-  const { data, error } = await supabase
-    .from("calendar_events")
-    .select("*")
-    .eq("user_id", userId)
-    .gte("starts_at", timeMin)
-    .lt("starts_at", timeMax)
-    .order("starts_at", { ascending: true });
-
-  if (error) throw error;
-  return (data || []) as CalendarEvent[];
+  return { synced: rows.length };
 }
