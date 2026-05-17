@@ -33,6 +33,7 @@ export async function middleware(request: NextRequest) {
     "/tasks",
     "/library",
     "/contacts",
+    "/settings",
     "/documents",
     "/reading-room",
   ];
@@ -60,6 +61,7 @@ export const config = {
     "/tasks/:path*",
     "/library/:path*",
     "/contacts/:path*",
+    "/settings/:path*",
     "/documents/:path*",
     "/reading-room/:path*",
     "/login",

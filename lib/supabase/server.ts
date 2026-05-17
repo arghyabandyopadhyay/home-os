@@ -13,8 +13,15 @@ export async function createClient() {
           return cookieStore.getAll();
         },
 
-        setAll() {
-          // no-op in server components
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // setAll may be called from Server Components where cookies
+            // are read-only. The middleware will refresh the session later.
+          }
         },
       },
     },
