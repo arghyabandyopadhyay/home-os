@@ -9,11 +9,12 @@ Home OS is a calm personal organization platform. It is NOT a productivity hustl
 | Module | Route | Component Dir | Lib File |
 |--------|-------|---------------|----------|
 | Dashboard | `/dashboard` | `components/dashboard/` | `lib/dashboard.ts` |
-| Notes | `/notes`, `/notes/[id]` | `components/notes/` | `lib/notes.ts` |
-| Tasks | `/tasks` | `components/tasks/` | `lib/tasks.ts` |
-| Calendar | `/calendar` | — | `lib/calendar.ts`, `lib/google-calendar.ts` |
-| Library | `/library`, `/reader/[id]` | `components/library/` | `lib/books.ts` |
-| Contacts | `/contacts` | `components/contacts/` | `lib/contacts.ts` |
+| Notes | `/notes`, `/notes/[id]` | `components/notes/` | `lib/notes.ts`, `lib/notes-utils.ts` |
+| Tasks | `/tasks` | `components/tasks/` | `lib/tasks.ts`, `lib/tasks-helpers.ts` |
+| Calendar | `/calendar` | `components/calendar/` | `lib/calendar.ts`, `lib/google-calendar.ts` |
+| Library | `/library`, `/reader/[id]` | `components/library/` | `lib/books.ts`, `lib/google-books.ts` |
+| Documents | `/documents`, `/documents/[id]` | `components/documents/` | `lib/documents.ts`, `lib/documents-utils.ts` |
+| Contacts | `/contacts` | `components/contacts/` | `lib/contacts.ts`, `lib/contacts-utils.ts`, `lib/google-contacts.ts` |
 | Settings | `/settings` | `components/settings/` | `lib/preferences.ts`, `lib/user-settings.ts` |
 
 ## Tech Stack
@@ -23,9 +24,10 @@ Home OS is a calm personal organization platform. It is NOT a productivity hustl
 - **Database / Auth / Storage**: Supabase (PostgreSQL + RLS + Buckets)
 - **Styling**: Tailwind CSS v4 + shadcn/ui components
 - **State**: Zustand (global), TanStack Query (server state)
-- **Icons**: Lucide React + Phosphor Icons
+- **Icons**: Lucide React + Phosphor Icons (`@phosphor-icons/react`)
 - **Toasts**: Sonner
 - **Animations**: Framer Motion
+- **Testing**: Vitest + Testing Library + fast-check (property-based)
 - **Hosting**: Vercel
 
 ## Project Structure
@@ -33,29 +35,47 @@ Home OS is a calm personal organization platform. It is NOT a productivity hustl
 ```
 app/                    # Next.js App Router pages
   api/                  # Route handlers
-  (pages)/              # Page components (server components by default)
+  (app)/                # Protected app shell (layout with sidebar + header)
+  (marketing)/          # Public marketing pages
+  auth/callback/        # OAuth callback handler
 components/
-  layout/               # Shell: sidebar, header, command menu
+  layout/               # Shell: sidebar, header, command menu, app-providers
   ui/                   # shadcn primitives
+  auth/                 # Auth-related components
+  calendar/             # Calendar feature components
   dashboard/            # Dashboard widgets
+  documents/            # Documents feature components
   notes/                # Notes feature components
   tasks/                # Tasks feature components
   library/              # Library/reader components
   contacts/             # Contacts components
   settings/             # Settings components
+  landing/              # Landing page components
+  legal/                # Legal pages (privacy, terms)
   onboarding/           # Onboarding dialog
   providers/            # React context providers
   theme/                # Theme provider
+hooks/
+  use-user-preferences.ts  # User preferences hook
 lib/
   supabase/
     client.ts           # Browser Supabase client
     server.ts           # Server Supabase client (async, uses cookies)
+  auth/                 # Auth utility functions
   *.ts                  # Feature-specific data access functions
 types/
   database.ts           # Auto-generated Supabase types
-  *.ts                  # Feature-specific TypeScript types
+  book.ts               # Book types
+  calendar.ts           # Calendar types
+  contact.ts            # Contact types
+  document.ts           # Document types
+  note.ts               # Note types
+  task.ts               # Task types
+  user-preferences.ts   # User preferences types
 providers/
   query-provider.tsx    # TanStack Query provider
 supabase/
   migrations/           # SQL migration files
+__tests__/              # Test files (Vitest + Testing Library)
+scripts/                # Utility scripts
 ```
