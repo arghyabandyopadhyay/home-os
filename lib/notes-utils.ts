@@ -35,7 +35,7 @@ export function filterNotesByTag(
   notes: Note[],
   tag: string
 ): Note[] {
-  return notes.filter((note) => note.tags.includes(tag))
+  return notes.filter((note) => (note.tags ?? []).includes(tag))
 }
 
 /**

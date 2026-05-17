@@ -424,9 +424,9 @@ export function CommandMenu() {
                     <File className="mr-2 h-4 w-4" />
                     <div className="flex flex-col">
                       <span>{doc.title}</span>
-                      {doc.tags.length > 0 && (
+                      {(doc.tags ?? []).length > 0 && (
                         <span className="text-xs text-muted-foreground">
-                          {doc.tags.join(", ")}
+                          {(doc.tags ?? []).join(", ")}
                         </span>
                       )}
                     </div>

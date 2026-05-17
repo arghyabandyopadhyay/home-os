@@ -35,7 +35,7 @@ export function DocumentsView({
   // Collect all unique tags from documents
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
-    documents.forEach((doc) => doc.tags.forEach((t) => tagSet.add(t)))
+    documents.forEach((doc) => (doc.tags ?? []).forEach((t) => tagSet.add(t)))
     return Array.from(tagSet).sort()
   }, [documents])
 
@@ -206,9 +206,9 @@ export function DocumentsView({
     if (!trimmed) return
 
     const doc = documents.find((d) => d.id === id)
-    if (!doc || doc.tags.includes(trimmed)) return
+    if (!doc || (doc.tags ?? []).includes(trimmed)) return
 
-    const newTags = [...doc.tags, trimmed]
+    const newTags = [...(doc.tags ?? []), trimmed]
     setDocuments((prev) =>
       prev.map((d) => (d.id === id ? { ...d, tags: newTags } : d))
     )
@@ -223,7 +223,7 @@ export function DocumentsView({
     const doc = documents.find((d) => d.id === id)
     if (!doc) return
 
-    const newTags = doc.tags.filter((t) => t !== tag)
+    const newTags = (doc.tags ?? []).filter((t) => t !== tag)
     setDocuments((prev) =>
       prev.map((d) => (d.id === id ? { ...d, tags: newTags } : d))
     )
@@ -478,7 +478,7 @@ function DocumentCard({
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1">
-        {doc.tags.map((tag) => (
+        {(doc.tags ?? []).map((tag) => (
           <span
             key={tag}
             className="inline-flex items-center gap-1 rounded-lg bg-app-elevated px-2 py-0.5 text-xs text-app-muted"
@@ -549,9 +549,9 @@ function DocumentListItem({
           <span className="text-xs text-app-muted">
             {new Date(doc.created_at).toLocaleDateString()}
           </span>
-          {doc.tags.length > 0 && (
+          {(doc.tags ?? []).length > 0 && (
             <span className="text-xs text-app-muted">
-              · {doc.tags.join(", ")}
+              · {(doc.tags ?? []).join(", ")}
             </span>
           )}
         </div>

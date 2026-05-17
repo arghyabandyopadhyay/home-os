@@ -50,7 +50,7 @@ export function NotesSidebar({
 
   // Collect all unique tags from notes
   const allTags = Array.from(
-    new Set(notes.flatMap((n) => n.tags))
+    new Set(notes.flatMap((n) => n.tags ?? []))
   ).sort()
 
   // Apply filters
@@ -184,9 +184,9 @@ export function NotesSidebar({
                 {truncatePreview(note.content, 120) || "Empty note"}
               </p>
 
-              {note.tags.length > 0 && (
+              {(note.tags ?? []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {note.tags.map((tag) => (
+                  {(note.tags ?? []).map((tag) => (
                     <span
                       key={tag}
                       className="rounded-md bg-app-elevated px-1.5 py-0.5 text-xs text-app-muted"

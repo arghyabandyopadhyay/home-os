@@ -33,7 +33,7 @@ export function filterDocumentsByQuery(
   return documents.filter(
     (doc) =>
       doc.title.toLowerCase().includes(lower) ||
-      doc.tags.some((tag) => tag.toLowerCase().includes(lower))
+      (doc.tags ?? []).some((tag) => tag.toLowerCase().includes(lower))
   )
 }
 
@@ -44,6 +44,6 @@ export function filterDocumentsByTag(
   if (!tag) return documents
 
   return documents.filter((doc) =>
-    doc.tags.some((t) => t.toLowerCase() === tag.toLowerCase())
+    (doc.tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase())
   )
 }
