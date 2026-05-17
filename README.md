@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Home OS
+
+A calm personal organization platform built with Next.js. Home OS is a quiet space to manage your notes, tasks, calendar, contacts, and reading — without the noise of typical productivity tools.
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **React**: 19
+- **Database / Auth / Storage**: Supabase (PostgreSQL + RLS + Buckets)
+- **Styling**: Tailwind CSS v4 + shadcn/ui
+- **State**: Zustand (global), TanStack Query (server state)
+- **Icons**: Lucide React + Phosphor Icons
+- **Toasts**: Sonner
+- **Animations**: Framer Motion
+- **Hosting**: Vercel
+
+## Modules
+
+| Module | Route |
+|--------|-------|
+| Dashboard | `/dashboard` |
+| Notes | `/notes`, `/notes/[id]` |
+| Tasks | `/tasks` |
+| Calendar | `/calendar` |
+| Library | `/library`, `/reader/[id]` |
+| Contacts | `/contacts`, `/contact` |
+| Documents | `/documents`, `/documents/[id]` |
+| Settings | `/settings` |
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- A Supabase project (or local Supabase via CLI)
+
+### Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Install & Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-## Learn More
+### Available Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/            # Next.js App Router pages & API routes
+components/     # React components organized by feature
+  ui/           # shadcn/ui primitives
+  layout/       # Shell (sidebar, header, command menu)
+  notes/        # Notes feature
+  tasks/        # Tasks feature
+  calendar/     # Calendar feature
+  library/      # Library/reader feature
+  contacts/     # Contacts feature
+  settings/     # Settings feature
+lib/            # Data access & utility functions
+  supabase/     # Supabase client helpers (server & browser)
+types/          # TypeScript type definitions
+supabase/
+  migrations/   # SQL migration files
+```
 
-## Deploy on Vercel
+## Supabase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx supabase start          # Start local Supabase stack
+npx supabase db reset       # Reset and re-run all migrations
+npx supabase gen types typescript --local > types/database.ts  # Regenerate types
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+The app deploys to Vercel. Pushing to `main` triggers a production deploy. Set environment variables in the Vercel project dashboard.
+
+## License
+
+Private project.
