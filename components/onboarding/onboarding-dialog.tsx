@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckSquare, FileText, LayoutDashboard } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { usePreferences } from "@/components/providers/user-preferences-provider";
+import { readLocalCache } from "@/lib/preferences-cache";
 
 const steps = [
   {
@@ -35,9 +36,17 @@ export function OnboardingDialog() {
   const [step, setStep] = useState(0);
   const router = useRouter();
   const { prefs, loading, update } = usePreferences();
+  const dismissed = useRef(false);
 
   useEffect(() => {
-    if (loading || prefs.onboardingComplete) return;
+    // Never show if already dismissed this session
+    if (dismissed.current) return;
+    // Don't show while still loading remote preferences
+    if (loading) return;
+    // Check both context state AND localStorage directly as a safety net
+    if (prefs.onboardingComplete) return;
+    const cached = readLocalCache();
+    if (cached?.onboardingComplete) return;
 
     const timer = window.setTimeout(() => {
       setOpen(true);
@@ -46,9 +55,13 @@ export function OnboardingDialog() {
     return () => window.clearTimeout(timer);
   }, [loading, prefs.onboardingComplete]);
 
-  async function finish(goTo?: string) {
-    await update({ onboardingComplete: true });
+  function finish(goTo?: string) {
+    dismissed.current = true;
     setOpen(false);
+    // Persist in background — don't await to avoid blocking/restarting UI
+    update({ onboardingComplete: true }).catch(() => {
+      // Best effort — cache is already written by update()
+    });
     if (goTo) router.push(goTo);
   }
 
