@@ -1,8 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { toast, Toaster } from "sonner";
+import { OAuthButtonGroup } from "@/components/auth/oauth-button-group";
 import { FooterNav } from "@/components/legal/footer-nav";
+
+function sanitizeErrorMessage(raw: string): string {
+  let message = raw.slice(0, 200);
+  // Remove stack trace lines
+  message = message.replace(/\s*at\s+.*/g, "");
+  // Remove JSON-like content
+  message = message.replace(/\{[^}]*\}/g, "");
+  // Remove HTTP status codes like "404" or "500"
+  message = message.replace(/\b[1-5]\d{2}\b/g, "");
+  // Trim whitespace
+  message = message.trim();
+  return message || "Authentication failed";
+}
 
 export default function LoginPage() {
   const supabase = createClient();
@@ -10,6 +25,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorDesc = params.get("error_description");
+    if (errorDesc) {
+      toast.error(sanitizeErrorMessage(errorDesc));
+      // Clean URL without reload
+      window.history.replaceState({}, "", "/login");
+    }
+  }, []);
 
   async function handleAuth() {
     if (!email.trim()) {
@@ -44,6 +69,15 @@ export default function LoginPage() {
           {isSignup ? "Create account" : "Welcome back"}
         </h1>
         <p className="mb-6 text-app-muted">Sign in to Home OS</p>
+
+        <OAuthButtonGroup onError={(message) => toast.error(message)} />
+
+        <div className="my-6 flex items-center gap-4">
+          <div className="flex-1 border-t border-app" />
+          <span className="text-app-muted text-xs">or</span>
+          <div className="flex-1 border-t border-app" />
+        </div>
+
         <input
           type="email"
           placeholder="Email"
@@ -77,6 +111,7 @@ export default function LoginPage() {
       <div className="mt-8">
         <FooterNav />
       </div>
+      <Toaster richColors position="top-right" />
     </div>
   );
 }
