@@ -87,6 +87,14 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="border-t border-app px-6 py-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <Link href="/privacy" className="text-xs link-muted">Privacy</Link>
+          <Link href="/terms" className="text-xs link-muted">Terms</Link>
+          <Link href="/contact" className="text-xs link-muted">Contact</Link>
+        </div>
+      </div>
     </aside>
   );
 }

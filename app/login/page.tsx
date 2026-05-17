@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FooterNav } from "@/components/legal/footer-nav";
 
 export default function LoginPage() {
   const supabase = createClient();
@@ -37,7 +38,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-app p-6">
       <div className="panel-app w-full max-w-md p-8">
         <h1 className="mb-2 text-3xl font-bold text-app">
           {isSignup ? "Create account" : "Welcome back"}
@@ -72,6 +73,9 @@ export default function LoginPage() {
         >
           {isSignup ? "Already have an account?" : "Create an account"}
         </button>
+      </div>
+      <div className="mt-8">
+        <FooterNav />
       </div>
     </div>
   );
