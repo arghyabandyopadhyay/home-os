@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
  * Unit tests for Auth Callback Handler
  * Tests the GET handler at app/auth/callback/route.ts
  *
- * Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+ * Validates: Requirements 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
  */
 
 // Mock the Supabase server client
@@ -127,5 +127,111 @@ describe("Auth Callback Handler", () => {
       "Authentication failed"
     )
     expect(mockExchangeCodeForSession).toHaveBeenCalledWith("crash-code")
+  })
+
+  describe("Recovery flow (type=recovery)", () => {
+    /**
+     * Validates: Requirement 4.3
+     * WHEN the Auth_Callback_Handler receives a callback with type=recovery
+     * and code exchange succeeds, it SHALL redirect to /reset-password
+     */
+    it("redirects to /reset-password when type=recovery and code exchange succeeds", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null })
+
+      const request = new Request(
+        "http://localhost:3000/auth/callback?code=recovery-code&type=recovery"
+      )
+      const response = await GET(request)
+
+      expect(response.status).toBe(307)
+      const redirectUrl = new URL(response.headers.get("location")!)
+      expect(redirectUrl.pathname).toBe("/reset-password")
+      expect(mockExchangeCodeForSession).toHaveBeenCalledWith("recovery-code")
+    })
+
+    /**
+     * Validates: Requirement 4.4
+     * IF the Auth_Callback_Handler receives a type=recovery callback and the
+     * code exchange fails, it SHALL redirect to /login with expired link error
+     */
+    it("redirects to /login with expired link error when type=recovery and code exchange fails", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({
+        error: { message: "Invalid or expired code" },
+      })
+
+      const request = new Request(
+        "http://localhost:3000/auth/callback?code=expired-code&type=recovery"
+      )
+      const response = await GET(request)
+
+      expect(response.status).toBe(307)
+      const redirectUrl = new URL(response.headers.get("location")!)
+      expect(redirectUrl.pathname).toBe("/login")
+      expect(redirectUrl.searchParams.get("error_description")).toBe(
+        "Reset link has expired. Please request a new one."
+      )
+      expect(mockExchangeCodeForSession).toHaveBeenCalledWith("expired-code")
+    })
+
+    /**
+     * Validates: Requirement 4.4
+     * IF the code exchange throws an exception during recovery,
+     * it SHALL redirect to /login with expired link error
+     */
+    it("redirects to /login with expired link error when type=recovery and code exchange throws", async () => {
+      mockExchangeCodeForSession.mockRejectedValue(
+        new Error("Network error")
+      )
+
+      const request = new Request(
+        "http://localhost:3000/auth/callback?code=throw-code&type=recovery"
+      )
+      const response = await GET(request)
+
+      expect(response.status).toBe(307)
+      const redirectUrl = new URL(response.headers.get("location")!)
+      expect(redirectUrl.pathname).toBe("/login")
+      expect(redirectUrl.searchParams.get("error_description")).toBe(
+        "Reset link has expired. Please request a new one."
+      )
+      expect(mockExchangeCodeForSession).toHaveBeenCalledWith("throw-code")
+    })
+
+    /**
+     * Validates: Requirement 4.4
+     * IF type=recovery and no code is provided, redirect to /login with expired link error
+     */
+    it("redirects to /login with expired link error when type=recovery and code is missing", async () => {
+      const request = new Request(
+        "http://localhost:3000/auth/callback?type=recovery"
+      )
+      const response = await GET(request)
+
+      expect(response.status).toBe(307)
+      const redirectUrl = new URL(response.headers.get("location")!)
+      expect(redirectUrl.pathname).toBe("/login")
+      expect(redirectUrl.searchParams.get("error_description")).toBe(
+        "Reset link has expired. Please request a new one."
+      )
+      expect(mockExchangeCodeForSession).not.toHaveBeenCalled()
+    })
+
+    /**
+     * Validates: Requirement 4.3 (non-recovery still goes to /dashboard)
+     * Non-recovery callbacks with successful code exchange still redirect to /dashboard
+     */
+    it("non-recovery callbacks still redirect to /dashboard on success", async () => {
+      mockExchangeCodeForSession.mockResolvedValue({ error: null })
+
+      const request = new Request(
+        "http://localhost:3000/auth/callback?code=oauth-code&type=signup"
+      )
+      const response = await GET(request)
+
+      expect(response.status).toBe(307)
+      const redirectUrl = new URL(response.headers.get("location")!)
+      expect(redirectUrl.pathname).toBe("/dashboard")
+      expect(mockExchangeCodeForSession).toHaveBeenCalledWith("oauth-code")
+    })
   })
 })

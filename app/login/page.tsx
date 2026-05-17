@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast, Toaster } from "sonner";
 import { OAuthButtonGroup } from "@/components/auth/oauth-button-group";
 import { FooterNav } from "@/components/legal/footer-nav";
+import { validateEmail } from "@/lib/auth/validation";
 
 function sanitizeErrorMessage(raw: string): string {
   let message = raw.slice(0, 200);
@@ -25,6 +26,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetEmailError, setResetEmailError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -62,6 +68,120 @@ export default function LoginPage() {
     setLoading(false);
   }
 
+  async function handleResetPassword() {
+    setResetEmailError("");
+
+    const validation = validateEmail(resetEmail);
+    if (!validation.valid) {
+      setResetEmailError(validation.error || "Please enter a valid email address");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const redirectTo = `${window.location.origin}/auth/callback?type=recovery`;
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo,
+      });
+
+      // Anti-enumeration: show same message for success and "user not found" errors
+      if (!error || error.message?.toLowerCase().includes("not found") || error.message?.toLowerCase().includes("not registered")) {
+        setResetSuccess(true);
+      } else {
+        // Network or server error — show toast and re-enable button
+        toast.error("Could not send reset link. Please try again.");
+      }
+    } catch {
+      toast.error("Could not send reset link. Please try again.");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  if (forgotPassword) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-app p-6">
+        <div className="panel-app w-full max-w-md p-8">
+          <h1 className="mb-2 text-3xl font-bold text-app">Reset password</h1>
+          <p className="mb-6 text-app-muted">
+            Enter your email and we&apos;ll send you a reset link.
+          </p>
+
+          {resetSuccess ? (
+            <div className="space-y-4">
+              <p className="text-app" role="status">
+                If an account exists with that email, we&apos;ve sent a password reset link.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotPassword(false);
+                  setResetSuccess(false);
+                  setResetEmail("");
+                  setResetEmailError("");
+                }}
+                className="text-sm text-app-muted hover:text-app"
+              >
+                Back to login
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={resetEmail}
+                  onChange={(e) => {
+                    setResetEmail(e.target.value);
+                    if (resetEmailError) setResetEmailError("");
+                  }}
+                  maxLength={254}
+                  className="input-app w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
+                  aria-describedby={resetEmailError ? "reset-email-error" : undefined}
+                  aria-invalid={resetEmailError ? true : undefined}
+                />
+                {resetEmailError && (
+                  <p
+                    id="reset-email-error"
+                    className="mt-2 text-sm text-red-500"
+                    role="alert"
+                  >
+                    {resetEmailError}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetLoading}
+                className="btn-primary-app w-full px-4 py-3 disabled:opacity-50"
+              >
+                {resetLoading ? "Sending..." : "Send reset link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotPassword(false);
+                  setResetEmailError("");
+                  setResetEmail("");
+                }}
+                className="text-sm text-app-muted hover:text-app"
+              >
+                Back to login
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="mt-8">
+          <FooterNav />
+        </div>
+        <Toaster richColors position="top-right" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-app p-6">
       <div className="panel-app w-full max-w-md p-8">
@@ -90,8 +210,20 @@ export default function LoginPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="input-app mb-6 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
+          className="input-app mb-4 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
         />
+
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setForgotPassword(true)}
+            className="text-sm text-app-muted hover:text-app"
+            aria-label="Reset your password"
+          >
+            Forgot password?
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={handleAuth}
