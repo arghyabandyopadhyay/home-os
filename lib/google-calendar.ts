@@ -410,11 +410,25 @@ export async function syncGoogleCalendarEvents({
     .filter((row): row is SyncedCalendarEventRow => row !== null);
 
   if (rows.length > 0) {
-    const { error } = await supabase.from("calendar_events").upsert(rows, {
-      onConflict: "user_id,source,external_calendar_id,external_id",
-    });
+    // Delete existing synced events for this user/source/calendar in the time range,
+    // then insert fresh. We can't use upsert because the unique index is partial
+    // (WHERE external_id IS NOT NULL) which PostgreSQL's ON CONFLICT can't target.
+    const { error: deleteError } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("user_id", userId)
+      .eq("source", "google")
+      .eq("external_calendar_id", connection.calendar_id)
+      .gte("starts_at", timeMin)
+      .lte("starts_at", timeMax);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
+
+    const { error: insertError } = await supabase
+      .from("calendar_events")
+      .insert(rows);
+
+    if (insertError) throw insertError;
   }
 
   return { synced: rows.length };
