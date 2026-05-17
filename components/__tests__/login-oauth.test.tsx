@@ -49,7 +49,7 @@ describe("Login Page OAuth UI", () => {
     render(<LoginPage />);
 
     expect(screen.getByText("Continue with Google")).toBeDefined();
-    expect(screen.getByText("Continue with GitHub")).toBeDefined();
+    expect(screen.queryByText("Continue with GitHub")).toBeNull();
   });
 
   it("renders OAuth buttons with correct aria-labels", async () => {
@@ -57,7 +57,7 @@ describe("Login Page OAuth UI", () => {
     render(<LoginPage />);
 
     expect(screen.getByLabelText("Sign in with Google")).toBeDefined();
-    expect(screen.getByLabelText("Sign in with GitHub")).toBeDefined();
+    expect(screen.queryByLabelText("Sign in with GitHub")).toBeNull();
   });
 
   it("renders Google icon SVG with correct viewBox", async () => {
@@ -74,15 +74,11 @@ describe("Login Page OAuth UI", () => {
     expect(paths?.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("renders GitHub icon SVG with correct viewBox", async () => {
+  it("does not render GitHub icon SVG (GitHub OAuth removed)", async () => {
     const LoginPage = (await import("@/app/login/page")).default;
     render(<LoginPage />);
 
-    const githubButton = screen.getByLabelText("Sign in with GitHub");
-    const githubSvg = githubButton.querySelector("svg");
-    expect(githubSvg).not.toBeNull();
-    expect(githubSvg?.getAttribute("viewBox")).toBe("0 0 24 24");
-    expect(githubSvg?.getAttribute("fill")).toBe("currentColor");
+    expect(screen.queryByLabelText("Sign in with GitHub")).toBeNull();
   });
 
   it("displays error toast on mount when error_description is in URL", async () => {
@@ -127,10 +123,8 @@ describe("Login Page OAuth UI", () => {
     render(<LoginPage />);
 
     const googleButton = screen.getByLabelText("Sign in with Google");
-    const githubButton = screen.getByLabelText("Sign in with GitHub");
 
     expect(googleButton.tagName).toBe("BUTTON");
-    expect(githubButton.tagName).toBe("BUTTON");
   });
 
   it("OAuth buttons have focus-visible ring classes for keyboard accessibility", async () => {
@@ -138,10 +132,8 @@ describe("Login Page OAuth UI", () => {
     render(<LoginPage />);
 
     const googleButton = screen.getByLabelText("Sign in with Google");
-    const githubButton = screen.getByLabelText("Sign in with GitHub");
 
     expect(googleButton.className).toContain("focus-visible:ring-2");
-    expect(githubButton.className).toContain("focus-visible:ring-2");
   });
 
   it("OAuth buttons are not disabled by default", async () => {
@@ -149,9 +141,7 @@ describe("Login Page OAuth UI", () => {
     render(<LoginPage />);
 
     const googleButton = screen.getByLabelText("Sign in with Google") as HTMLButtonElement;
-    const githubButton = screen.getByLabelText("Sign in with GitHub") as HTMLButtonElement;
 
     expect(googleButton.disabled).toBe(false);
-    expect(githubButton.disabled).toBe(false);
   });
 });

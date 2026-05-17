@@ -81,25 +81,14 @@ describe("OAuth Flow Integration", () => {
       });
     });
 
-    it("calls signInWithOAuth with github provider and correct redirectTo on GitHub button click", async () => {
-      mockSignInWithOAuth.mockResolvedValue({ error: null });
-
+    it("does not render a GitHub OAuth button (GitHub provider removed)", async () => {
       const onError = vi.fn();
       render(React.createElement(OAuthButtonGroup, { onError }));
 
-      const githubButton = screen.getByRole("button", {
+      const githubButton = screen.queryByRole("button", {
         name: "Sign in with GitHub",
       });
-      fireEvent.click(githubButton);
-
-      await waitFor(() => {
-        expect(mockSignInWithOAuth).toHaveBeenCalledWith({
-          provider: "github",
-          options: {
-            redirectTo: "http://localhost:3000/auth/callback",
-          },
-        });
-      });
+      expect(githubButton).toBeNull();
     });
 
     it("disables all buttons while OAuth flow is in progress", async () => {
