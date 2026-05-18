@@ -211,7 +211,7 @@ export function ContactsView({ initialContacts }: Props) {
 
         <Button
           onClick={handleAddContact}
-          className="btn-primary-app h-11 px-5"
+          className="btn-primary-app flex items-center gap-2 px-4 py-2.5 text-sm"
         >
           Add Contact
         </Button>
