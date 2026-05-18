@@ -14,6 +14,7 @@ import { QuickCapture } from "@/components/dashboard/quick-capture";
 import { PinnedNotes } from "@/components/dashboard/pinned-notes";
 import { OnboardingDialog } from "@/components/onboarding/onboarding-dialog";
 import { TodayTaskToggle } from "@/components/dashboard/today-task-toggle";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default async function DashboardPage() {
   const data = await getTodayData();
@@ -30,35 +31,55 @@ export default async function DashboardPage() {
     day: "numeric",
   }).format(new Date());
 
+  const subtitle =
+    "Your calm view across mind, tasks, people, and media — everything that matters today in one place.";
+
   return (
-    <div className="relative min-h-screen bg-app text-app">
+    <PageShell
+      title={`${greeting}, ${data.userName}`}
+      description={`${dateLabel} · ${subtitle}`}
+    >
       <OnboardingDialog />
 
-      <div className="relative mx-auto max-w-6xl space-y-8 px-6 py-10">
-        <header className="panel-app p-6">
-          <p className="text-sm text-app-muted">{dateLabel}</p>
-          <h1 className="mt-1 text-4xl font-semibold tracking-tight md:text-5xl">
-            {greeting}, {data.userName}
-          </h1>
-          <p className="mt-2 max-w-xl text-app-muted">
-            Your calm view across mind, tasks, people, and media — everything
-            that matters today in one place.
-          </p>
-        </header>
-
+      <div className="space-y-8">
+        {/* Quick Capture at top of content area */}
         <QuickCapture />
 
+        {/* Pinned Notes */}
         <PinnedNotes notes={data.pinnedNotes} />
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {[
+            { label: "Open tasks", value: data.counts.openTasks, href: "/tasks" },
+            { label: "Notes", value: data.counts.notes, href: "/notes" },
+            { label: "Reading", value: data.counts.reading, href: "/library" },
+            { label: "Contacts", value: data.counts.contacts, href: "/contacts" },
+          ].map((stat) => (
+            <Link
+              key={stat.href}
+              href={stat.href}
+              className="stat-card p-4 transition hover:border-blue-500/30"
+            >
+              <p className="stat-value">{stat.value}</p>
+              <p className="stat-label">{stat.label}</p>
+            </Link>
+          ))}
+        </div>
 
-<section className="card-app lg:col-span-2 p-6">
+        {/* Main activity grid: tasks (2/3) + reading (1/3) */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Focus Tasks — max 8, ordered by due_date ascending, overdue first */}
+          <section className="card-app p-6 lg:col-span-2">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <CheckSquare className="h-5 w-5 text-blue-500" />
                 Focus today
               </h2>
-              <Link href="/tasks" className="link-muted flex items-center gap-1">
+              <Link
+                href="/tasks"
+                className="link-muted flex items-center gap-1"
+              >
                 All tasks
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -66,7 +87,11 @@ export default async function DashboardPage() {
 
             {data.focusTasks.length === 0 ? (
               <p className="rounded-xl border border-dashed border-app py-8 text-center text-sm text-app-muted">
-                Nothing on your plate — capture a task above or add one in Tasks.
+                Nothing on your plate — capture a task above or head to{" "}
+                <Link href="/tasks" className="text-blue-500 hover:underline">
+                  Tasks
+                </Link>{" "}
+                to plan your day.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -100,23 +125,29 @@ export default async function DashboardPage() {
             )}
           </section>
 
+          {/* Currently Reading — max 3, ordered by updated_at descending */}
           <section className="card-app p-6">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <BookOpen className="h-5 w-5 text-orange-500" />
                 Reading now
               </h2>
-              <Link href="/library" className="link-muted">
-                Library →
+              <Link href="/library" className="link-muted flex items-center gap-1">
+                Library
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
 
             {data.readingBooks.length === 0 ? (
-              <p className="text-sm text-app-muted">
-                No active books.{" "}
-                <Link href="/library" className="text-blue-500 hover:underline">
-                  Add one
-                </Link>
+              <p className="rounded-xl border border-dashed border-app py-8 text-center text-sm text-app-muted">
+                No books in progress.{" "}
+                <Link
+                  href="/library"
+                  className="text-blue-500 hover:underline"
+                >
+                  Browse your library
+                </Link>{" "}
+                to start reading.
               </p>
             ) : (
               <ul className="space-y-3">
@@ -144,9 +175,7 @@ export default async function DashboardPage() {
                         </p>
                         <p className="text-xs text-app-muted">{book.author}</p>
                         {book.progress > 0 && (
-                          <div
-                            className="mt-2 h-1 w-full rounded-full bg-app-elevated"
-                          >
+                          <div className="mt-2 h-1 w-full rounded-full bg-app-elevated">
                             <div
                               className="h-full rounded-full bg-orange-500"
                               style={{ width: `${book.progress}%` }}
@@ -162,47 +191,74 @@ export default async function DashboardPage() {
           </section>
         </div>
 
+        {/* Secondary grid: notes + contacts */}
         <div className="grid gap-6 md:grid-cols-2">
+          {/* Recent Notes — max 6, ordered by updated_at descending */}
           <section className="card-app p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <FileText className="h-5 w-5 text-purple-500" />
                 Recent notes
               </h2>
-              <Link href="/notes" className="link-muted">
-                All notes →
+              <Link href="/notes" className="link-muted flex items-center gap-1">
+                All notes
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-            <ul className="space-y-2">
-              {data.recentNotes.slice(0, 4).map((note) => (
-                <li key={note.id}>
-                  <Link href={`/notes/${note.id}`} className="item-app block p-3">
-                    <p className="font-medium">{note.title}</p>
-                    <p className="mt-1 line-clamp-1 text-sm text-app-muted">
-                      {note.content || "Empty"}
-                    </p>
-                  </Link>
-                </li>
-              ))}
-              {data.recentNotes.length === 0 && (
-                <p className="text-sm text-app-muted">No notes yet.</p>
-              )}
-            </ul>
+
+            {data.recentNotes.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-app py-8 text-center text-sm text-app-muted">
+                Your notes will appear here.{" "}
+                <Link href="/notes" className="text-blue-500 hover:underline">
+                  Write your first note
+                </Link>{" "}
+                to get started.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {data.recentNotes.slice(0, 6).map((note) => (
+                  <li key={note.id}>
+                    <Link
+                      href={`/notes/${note.id}`}
+                      className="item-app block p-3"
+                    >
+                      <p className="font-medium">{note.title}</p>
+                      <p className="mt-1 line-clamp-1 text-sm text-app-muted">
+                        {note.content || "Empty note"}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
+          {/* Favorite Contacts — max 4 */}
           <section className="card-app p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 <Users className="h-5 w-5 text-green-500" />
                 Favorite people
               </h2>
-              <Link href="/contacts" className="link-muted">
-                Contacts →
+              <Link
+                href="/contacts"
+                className="link-muted flex items-center gap-1"
+              >
+                Contacts
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+
             {data.favoriteContacts.length === 0 ? (
-              <p className="text-sm text-app-muted">
-                Star contacts to see them here on Today.
+              <p className="rounded-xl border border-dashed border-app py-8 text-center text-sm text-app-muted">
+                Star contacts to see them here.{" "}
+                <Link
+                  href="/contacts"
+                  className="text-blue-500 hover:underline"
+                >
+                  Visit Contacts
+                </Link>{" "}
+                to mark your favorites.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -225,25 +281,7 @@ export default async function DashboardPage() {
             )}
           </section>
         </div>
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[
-            { label: "Open tasks", value: data.counts.openTasks, href: "/tasks" },
-            { label: "Notes", value: data.counts.notes, href: "/notes" },
-            { label: "Reading", value: data.counts.reading, href: "/library" },
-            { label: "Contacts", value: data.counts.contacts, href: "/contacts" },
-          ].map((stat) => (
-            <Link
-              key={stat.href}
-              href={stat.href}
-              className="card-app p-4 transition hover:border-blue-500/30"
-            >
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-sm text-app-muted">{stat.label}</p>
-            </Link>
-          ))}
-        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

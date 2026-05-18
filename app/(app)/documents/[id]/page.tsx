@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { DocumentReader } from "@/components/documents/document-reader"
 import { redirect } from "next/navigation"
 import Link from "next/link"
+import { PageShell } from "@/components/layout/page-shell"
+import { ArrowLeft } from "lucide-react"
 
 export default async function DocumentReaderPage({
   params,
@@ -29,17 +31,20 @@ export default async function DocumentReaderPage({
 
   if (!document) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app text-app">
-        <div className="text-center">
-          <p className="text-xl">Document not found</p>
+      <PageShell title="Document not found">
+        <div className="card-app flex flex-col items-center justify-center p-10 text-center">
+          <p className="text-app-muted">
+            This document doesn&apos;t exist or you don&apos;t have access.
+          </p>
           <Link
             href="/documents"
-            className="mt-4 inline-block text-blue-500 hover:underline"
+            className="btn-primary-app mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm"
           >
+            <ArrowLeft className="h-4 w-4" />
             Back to Documents
           </Link>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
@@ -50,19 +55,27 @@ export default async function DocumentReaderPage({
   const signedUrl = signedUrlData?.signedUrl || ""
 
   return (
-    <div className="flex h-screen flex-col bg-app text-app">
-      <header className="flex items-center gap-4 border-b border-app px-6 py-3">
+    <PageShell
+      title={document.title}
+      description="Document viewer"
+      actions={
         <Link
           href="/documents"
-          className="text-sm text-app-muted hover:text-app"
+          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-app-muted hover:bg-app-elevated hover:text-app"
+          aria-label="Back to documents"
         >
-          ← Documents
+          <ArrowLeft className="h-4 w-4" />
+          Documents
         </Link>
-        <h1 className="truncate text-sm font-semibold">{document.title}</h1>
-      </header>
-      <div className="flex-1">
-        <DocumentReader url={signedUrl} title={document.title} />
+      }
+    >
+      <div className="flex justify-center">
+        <div className="w-full min-w-0 lg:w-[75%]">
+          <div className="card-app h-[calc(100vh-280px)] overflow-hidden">
+            <DocumentReader url={signedUrl} title={document.title} />
+          </div>
+        </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

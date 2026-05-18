@@ -1,35 +1,36 @@
 import { ReactNode } from "react";
 
 type PageShellProps = {
-  title?: string;
+  title: string;
   description?: string;
+  actions?: ReactNode;
   children: ReactNode;
-  panel?: boolean;
 };
 
 export function PageShell({
   title,
   description,
+  actions,
   children,
-  panel = true,
 }: PageShellProps) {
   return (
-    <div className="relative min-h-screen bg-app text-app">
+    <main className="relative min-h-screen bg-app text-app">
       <div className="relative mx-auto max-w-6xl px-6 py-10">
-        {title && (
-          <div className="panel-app mb-8 p-6">
-            <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
-            {description && (
-              <p className="mt-2 text-app-muted">{description}</p>
+        <header className="panel-app mb-8 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
+              {description && (
+                <p className="mt-2 text-app-muted">{description}</p>
+              )}
+            </div>
+            {actions && (
+              <div className="flex shrink-0 items-center gap-2">{actions}</div>
             )}
           </div>
-        )}
-        {panel ? (
-          <div className="panel-app p-6">{children}</div>
-        ) : (
-          children
-        )}
+        </header>
+        <section>{children}</section>
       </div>
-    </div>
+    </main>
   );
 }

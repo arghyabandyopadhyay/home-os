@@ -8,8 +8,10 @@
 | Production build | `npm run build` |
 | Start production server | `npm run start` |
 | Lint | `npm run lint` |
+| Run tests (single run) | `npm run test` |
+| Run tests (watch mode) | `npm run test:watch` |
 
-There is no test runner configured. Add one before writing tests.
+The test runner is **Vitest** with `@testing-library/react`, `jsdom`, and `fast-check` for property-based tests. Config is in `vitest.config.ts` with setup in `vitest.setup.ts`. Tests live in `__tests__/`.
 
 ## Environment Variables
 
@@ -18,8 +20,17 @@ Required in `.env.local` (never commit this file):
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
+NEXT_PUBLIC_SITE_URL=
+GOOGLE_CALENDAR_CLIENT_ID=
+GOOGLE_CALENDAR_CLIENT_SECRET=
+GOOGLE_CALENDAR_REDIRECT_URI=
+GOOGLE_BOOKS_API_KEY=
+```
+
+Optional (falls back to calendar credentials if not set):
+```
+GOOGLE_CONTACTS_CLIENT_ID=
+GOOGLE_CONTACTS_CLIENT_SECRET=
 ```
 
 `NEXT_PUBLIC_` variables are exposed to the browser. Keep secrets (Google OAuth credentials, service role keys) in non-prefixed variables and access them only in server-side code.
@@ -31,7 +42,7 @@ Follow this checklist when adding a new section to the app:
 1. **Type** — add a `types/<feature>.ts` file with the row type.
 2. **Lib** — add a `lib/<feature>.ts` file with all data access functions (server-side, using `@/lib/supabase/server`).
 3. **Migration** — add a SQL file in `supabase/migrations/` to create the table with RLS policies.
-4. **Page** — add `app/<feature>/page.tsx` as a Server Component. Fetch data here, pass as props.
+4. **Page** — add `app/(app)/<feature>/page.tsx` as a Server Component. Fetch data here, pass as props.
 5. **Components** — add `components/<feature>/` directory with client components for interactivity.
 6. **Sidebar** — add the route to the `items` array in `components/layout/sidebar.tsx`.
 7. **Middleware** — add the route to `protectedRoutes` and `matcher` in `app/middleware.ts`.
@@ -66,7 +77,9 @@ npx supabase gen types typescript --local > types/database.ts
 The app deploys to **Vercel**. Pushing to `main` triggers a production deploy. Environment variables must be set in the Vercel project dashboard — they are not read from `.env.local` in production.
 
 Image domains allowed by `next.config.ts`:
-- `covers.openlibrary.org`
-- `books.google.com`
+- `covers.openlibrary.org` (https + http)
+- `books.google.com` (https + http)
+- `lh3.googleusercontent.com` (https)
+- `avatars.githubusercontent.com` (https)
 
 Add new external image domains to `next.config.ts` → `images.remotePatterns` before using `next/image` with them.

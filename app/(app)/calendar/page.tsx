@@ -4,6 +4,8 @@ import { getMonthEvents, getGoogleCalendarStatus } from "@/lib/calendar";
 import { getTasks } from "@/lib/tasks";
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView } from "@/components/calendar/calendar-view";
+import { PageShell } from "@/components/layout/page-shell";
+import { CalendarEmptyState } from "@/components/calendar/calendar-empty-state";
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -22,23 +24,19 @@ export default async function CalendarPage() {
     getGoogleCalendarStatus(),
   ]);
 
-  return (
-    <div className="min-h-screen bg-app text-app">
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-10">
-        <header className="panel-app p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-500/10">
-              <CalendarDays className="h-5 w-5 text-sky-500" />
-            </div>
-            <div>
-              <p className="text-sm text-app-muted">Calendar</p>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Schedule
-              </h1>
-            </div>
-          </div>
-        </header>
+  const hasEvents = events.length > 0;
 
+  return (
+    <PageShell
+      title="Calendar"
+      description="Your schedule at a glance"
+      actions={
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-5 w-5 text-app-muted" aria-hidden="true" />
+        </div>
+      }
+    >
+      {hasEvents || googleCalendarConnected ? (
         <CalendarView
           initialEvents={events}
           initialTasks={tasks}
@@ -46,7 +44,11 @@ export default async function CalendarPage() {
           initialYear={now.getFullYear()}
           initialMonth={now.getMonth()}
         />
-      </div>
-    </div>
+      ) : (
+        <div className="card-app">
+          <CalendarEmptyState />
+        </div>
+      )}
+    </PageShell>
   );
 }

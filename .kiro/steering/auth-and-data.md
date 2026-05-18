@@ -9,10 +9,12 @@ Auth is handled entirely by Supabase. The flow is:
 3. Middleware (`app/middleware.ts`) guards all protected routes by calling `supabase.auth.getUser()` on every request.
 4. Unauthenticated requests to protected routes are redirected to `/login`. Authenticated users hitting `/login` are redirected to `/dashboard`.
 
+The callback handler also supports password recovery flows — if `type=recovery`, it redirects to `/reset-password` after exchanging the code.
+
 ### Protected Routes
 
 Defined in `app/middleware.ts`:
-- `/dashboard`, `/calendar`, `/notes`, `/tasks`, `/library`, `/contacts`, `/reading-room`
+- `/dashboard`, `/calendar`, `/notes`, `/tasks`, `/library`, `/contacts`, `/settings`, `/documents`, `/reading-room`
 
 To protect a new route, add it to both the `protectedRoutes` array and the `matcher` config in middleware.
 
@@ -45,11 +47,14 @@ PostgreSQL via Supabase. All tables have Row Level Security (RLS) enabled — qu
 
 | Table | Key columns |
 |---|---|
-| `profiles` | `id` (= auth user id), `email`, `created_at` |
-| `notes` | `id`, `user_id`, `title`, `content`, `created_at`, `updated_at` |
-| `tasks` | `id`, `user_id`, `title`, `completed`, `due_date`, `created_at` |
-| `books` | `id`, `user_id`, `title`, `author`, `status`, `progress`, `cover_url`, `file_path`, `updated_at` |
-| `contacts` | `id`, `user_id`, `name`, `email`, `role`, `company`, `favorite`, `updated_at` |
+| `profiles` | `id` (= auth user id), `email`, `full_name`, `avatar_url`, `auth_provider`, `metadata`, `created_at` |
+| `notes` | `id`, `user_id`, `title`, `content`, `tags`, `linked_book_id`, `linked_contact_id`, `created_at`, `updated_at` |
+| `tasks` | `id`, `user_id`, `title`, `completed`, `due_date`, `priority` (low/medium/high), `created_at`, `updated_at` |
+| `contacts` | `id`, `user_id`, `name`, `email`, `phone`, `role`, `company`, `notes`, `favorite`, `source`, `google_contact_id`, `created_at`, `updated_at` |
+| `documents` | `id`, `user_id`, `title`, `file_path`, `file_size`, `tags`, `created_at`, `updated_at` |
+| `calendar_events` | `id`, `user_id`, `title`, `description`, `starts_at`, `ends_at`, `all_day`, `location`, `source`, `external_id`, `external_calendar_id`, `html_link`, `created_at`, `updated_at` |
+| `calendar_connections` | `id`, `user_id`, `provider`, `calendar_id`, `access_token`, `refresh_token`, `expires_at`, `connected_email`, `scope`, `created_at`, `updated_at` |
+| `google_contacts_connections` | `id`, `user_id`, `access_token`, `refresh_token`, `expires_at`, `connected_email`, `scope`, `created_at`, `updated_at` |
 
 Generated TypeScript types are in `types/database.ts`. Regenerate after schema changes with:
 ```bash
@@ -82,11 +87,15 @@ const { count } = await supabase
 
 ## File Storage
 
-Supabase Storage buckets are used for book files (PDFs, EPUBs) and cover images. File paths are stored in the `books` table (`file_path`, `cover_url`). Access files via signed URLs or public bucket URLs depending on bucket policy.
+Supabase Storage buckets are used for:
+- Book files (PDFs, EPUBs) — paths stored in the library system
+- Document files — paths stored in the `documents` table (`file_path`)
+
+Access files via signed URLs or public bucket URLs depending on bucket policy.
 
 ## User Preferences
 
-User preferences (theme, onboarding state, etc.) are stored in a `user_settings` table and accessed via `lib/preferences.ts` and `lib/user-settings.ts`. The `UserPreferencesProvider` in `components/providers/user-preferences-provider.tsx` exposes them via the `usePreferences()` hook throughout the client-side tree.
+User preferences (theme, onboarding state, etc.) are accessed via `lib/preferences.ts` and `lib/user-settings.ts`. The `usePreferences()` hook (in `hooks/use-user-preferences.ts`) exposes them throughout the client-side tree.
 
 ## API Routes
 
@@ -95,5 +104,10 @@ Route handlers live in `app/api/`. They follow the same auth pattern — create 
 Current API routes:
 - `app/api/google-calendar/connect` — initiates Google OAuth for calendar
 - `app/api/google-calendar/callback` — handles Google OAuth callback
+- `app/api/google-calendar/disconnect` — disconnects Google Calendar
 - `app/api/google-calendar/sync` — syncs events from Google Calendar
+- `app/api/google-contacts/connect` — initiates Google OAuth for contacts
+- `app/api/google-contacts/callback` — handles Google Contacts OAuth callback
+- `app/api/google-contacts/sync` — syncs contacts from Google
 - `app/api/search-books` — proxies Google Books API search
+- `app/api/account/delete` — handles account deletion

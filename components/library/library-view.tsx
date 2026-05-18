@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Plus } from "lucide-react";
+import { Plus, BookOpen } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -11,10 +11,12 @@ import { v4 as uuid } from "uuid";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { RatingStars } from "./rating-stars";
-
 import { ProgressBar } from "./progress-bar";
+import { EmptyState } from "@/components/shared/empty-state";
 
 import { type GoogleBookResult } from "@/lib/google-books";
+
+const ITEMS_PER_SECTION = 5;
 
 export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   const supabase = createClient();
@@ -22,8 +24,10 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   const searchCacheRef = useRef<Record<string, GoogleBookResult>>({});
 
   const [books, setBooks] = useState(initialBooks);
-
   const [search, setSearch] = useState("");
+  const [showAllReading, setShowAllReading] = useState(false);
+  const [showAllToRead, setShowAllToRead] = useState(false);
+  const [showAllFinished, setShowAllFinished] = useState(false);
 
   async function createBook() {
     const {
@@ -38,25 +42,15 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
     const optimisticBook = {
       id: uuid(),
-
       title: "",
-
       author: "",
-
       cover_url: "",
-
       status: "to_read",
-
       rating: 0,
-
       notes: "",
-
       progress: 0,
-
       isbn: "",
-
       published_year: "",
-
       description: "",
       preview_url: "",
       info_url: "",
@@ -66,7 +60,6 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
       pdf_url: "",
       file_path: "",
       file_type: "",
-
       created_at: new Date().toISOString(),
     };
 
@@ -84,9 +77,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
     if (error) {
       toast.error("Failed to add book");
-
       setBooks((prev) => prev.filter((book) => book.id !== optimisticBook.id));
-
       return;
     }
 
@@ -98,15 +89,12 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   async function autofillBook(id: string, title: string) {
     if (!title) return;
 
-    // Clear previous timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Debounce the API call by 800ms
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        // Check cache first
         if (searchCacheRef.current[title]) {
           const result = searchCacheRef.current[title];
           const updates = {
@@ -123,12 +111,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
           setBooks((prev) =>
             prev.map((book) =>
-              book.id === id
-                ? {
-                    ...book,
-                    ...updates,
-                  }
-                : book,
+              book.id === id ? { ...book, ...updates } : book,
             ),
           );
 
@@ -148,7 +131,6 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
           return;
         }
 
-        // Cache the result
         searchCacheRef.current[title] = result;
 
         const updates = {
@@ -165,12 +147,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
         setBooks((prev) =>
           prev.map((book) =>
-            book.id === id
-              ? {
-                  ...book,
-                  ...updates,
-                }
-              : book,
+            book.id === id ? { ...book, ...updates } : book,
           ),
         );
 
@@ -200,12 +177,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   async function updateBook(id: string, updates: Partial<Book>) {
     setBooks((prev) =>
       prev.map((book) =>
-        book.id === id
-          ? {
-              ...book,
-              ...updates,
-            }
-          : book,
+        book.id === id ? { ...book, ...updates } : book,
       ),
     );
 
@@ -214,7 +186,6 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
   async function deleteBook(id: string) {
     setBooks((prev) => prev.filter((book) => book.id !== id));
-
     await supabase.from("books").delete().eq("id", id);
   }
 
@@ -231,7 +202,6 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
     }
 
     const extension = file.name.split(".").pop();
-
     const path = `${user.id}/${bookId}.${extension}`;
 
     const { error } = await supabase.storage.from("books").upload(path, file, {
@@ -240,9 +210,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
     if (error) {
       console.error(error);
-
       toast.error(error.message);
-
       return;
     }
 
@@ -257,15 +225,53 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
     toast.success("Book uploaded");
   }
 
+  // Filter books by search
   const filteredBooks = books.filter(
     (book) =>
       book.title.toLowerCase().includes(search.toLowerCase()) ||
       book.author?.toLowerCase().includes(search.toLowerCase()),
   );
 
+  // Group books by status
+  const readingBooks = filteredBooks.filter((b) => b.status === "reading");
+  const toReadBooks = filteredBooks.filter((b) => b.status === "to_read");
+  const finishedBooks = filteredBooks.filter((b) => b.status === "finished");
+
+  // Limit displayed items per section
+  const displayedReading = showAllReading
+    ? readingBooks
+    : readingBooks.slice(0, ITEMS_PER_SECTION);
+  const displayedToRead = showAllToRead
+    ? toReadBooks
+    : toReadBooks.slice(0, ITEMS_PER_SECTION);
+  const displayedFinished = showAllFinished
+    ? finishedBooks
+    : finishedBooks.slice(0, ITEMS_PER_SECTION);
+
+  if (books.length === 0) {
+    return (
+      <EmptyState
+        module="library"
+        icon={BookOpen}
+        heading="Start building your library"
+        body="Add books you're reading, want to read, or have finished to track your reading journey."
+        actionLabel="Add your first book"
+        onAction={createBook}
+      />
+    );
+  }
+
   return (
-    <div>
-      <div className="mb-8 flex justify-end">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search books..."
+            className="input-app w-full px-4 py-3"
+          />
+        </div>
         <button
           onClick={createBook}
           className="btn-primary-app flex items-center gap-2 px-4 py-3"
@@ -275,205 +281,259 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
         </button>
       </div>
 
-      {books.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-app p-16 text-center text-app-muted">
-          No books yet
-        </div>
+      {/* Currently Reading Section */}
+      {readingBooks.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-medium tracking-tight">
+            Currently Reading
+          </h2>
+          <div className="space-y-2">
+            {displayedReading.map((book) => (
+              <div key={book.id} className="item-app flex items-center gap-4">
+                <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-app-elevated">
+                  {book.cover_url ? (
+                    <Image
+                      src={book.cover_url}
+                      alt={book.title}
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <BookOpen size={16} className="text-app-muted" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{book.title || "Untitled"}</p>
+                  <p className="truncate text-sm text-app-muted">
+                    {book.author || "Unknown author"}
+                  </p>
+                  <ProgressBar value={book.progress} />
+                </div>
+                <div className="shrink-0 text-sm text-app-muted">
+                  {book.progress}%
+                </div>
+              </div>
+            ))}
+          </div>
+          {readingBooks.length > ITEMS_PER_SECTION && (
+            <button
+              onClick={() => setShowAllReading(!showAllReading)}
+              className="text-sm text-app-muted transition hover:text-app"
+            >
+              {showAllReading
+                ? "Show less"
+                : `Show all ${readingBooks.length} books`}
+            </button>
+          )}
+        </section>
       )}
 
-      <div className="mb-6">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search books..."
-          className="w-full rounded-2xl border border-app bg-app-surface px-4 py-3 outline-none"
+      {/* To Read Section */}
+      {toReadBooks.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-medium tracking-tight">To Read</h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {displayedToRead.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                onUpdate={updateBook}
+                onDelete={deleteBook}
+                onAutofill={autofillBook}
+                onUpload={uploadBookFile}
+              />
+            ))}
+          </div>
+          {toReadBooks.length > ITEMS_PER_SECTION && (
+            <button
+              onClick={() => setShowAllToRead(!showAllToRead)}
+              className="text-sm text-app-muted transition hover:text-app"
+            >
+              {showAllToRead
+                ? "Show less"
+                : `Show all ${toReadBooks.length} books`}
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* Finished Section */}
+      {finishedBooks.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-medium tracking-tight">Finished</h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {displayedFinished.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                onUpdate={updateBook}
+                onDelete={deleteBook}
+                onAutofill={autofillBook}
+                onUpload={uploadBookFile}
+              />
+            ))}
+          </div>
+          {finishedBooks.length > ITEMS_PER_SECTION && (
+            <button
+              onClick={() => setShowAllFinished(!showAllFinished)}
+              className="text-sm text-app-muted transition hover:text-app"
+            >
+              {showAllFinished
+                ? "Show less"
+                : `Show all ${finishedBooks.length} books`}
+            </button>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function BookCard({
+  book,
+  onUpdate,
+  onDelete,
+  onAutofill,
+  onUpload,
+}: {
+  book: Book;
+  onUpdate: (id: string, updates: Partial<Book>) => void;
+  onDelete: (id: string) => void;
+  onAutofill: (id: string, title: string) => void;
+  onUpload: (id: string, file?: File) => void;
+}) {
+  return (
+    <div className="card-app p-4">
+      <div className="relative mb-4 aspect-3/4 overflow-hidden rounded-xl bg-app-elevated">
+        {book.cover_url ? (
+          <Image
+            src={book.cover_url}
+            alt={book.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-app-elevated text-center text-sm text-app-muted">
+            <div className="px-4">{book.title || "Untitled"}</div>
+          </div>
+        )}
+      </div>
+
+      <input
+        autoFocus={book.title === ""}
+        value={book.title}
+        placeholder="Book title"
+        onChange={(e) => onUpdate(book.id, { title: e.target.value })}
+        onBlur={() => onAutofill(book.id, book.title)}
+        className="mb-2 w-full bg-transparent text-lg font-semibold outline-none"
+      />
+
+      <input
+        value={book.author || ""}
+        placeholder="Author"
+        onChange={(e) => onUpdate(book.id, { author: e.target.value })}
+        className="mb-4 w-full bg-transparent text-sm text-app-muted outline-none"
+      />
+
+      <select
+        value={book.status}
+        onChange={(e) => onUpdate(book.id, { status: e.target.value })}
+        className={`mb-4 w-full rounded-xl border border-app p-2 text-sm ${
+          book.status === "finished"
+            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : book.status === "reading"
+              ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+              : "bg-app text-app-muted"
+        }`}
+      >
+        <option value="to_read">To Read</option>
+        <option value="reading">Reading</option>
+        <option value="finished">Finished</option>
+      </select>
+
+      <div className="mb-4">
+        <RatingStars
+          value={book.rating}
+          onChange={(rating) => onUpdate(book.id, { rating })}
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {filteredBooks.map((book) => (
-          <div
-            key={book.id}
-            className="
-  rounded-2xl
-  border
-  border-app
-  bg-app-surface
-  p-4
-  transition-all
-  hover:-translate-y-1
-  hover:border-blue-500/30
-"
-          >
-            <div className="relative mb-4 aspect-3/4 overflow-hidden rounded-2xl bg-app-elevated">
-              {book.cover_url ? (
-                <Image
-                  src={book.cover_url}
-                  alt={book.title}
-                  fill
-                  sizes="
-    (max-width: 640px) 100vw,
-    (max-width: 1024px) 50vw,
-    25vw
-  "
-                  className="object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-app-elevated text-center text-sm text-app-muted">
-                  <div className="px-4">{book.title || "Untitled"}</div>
-                </div>
-              )}
-            </div>
-
-            <input
-              autoFocus={book.title === ""}
-              value={book.title}
-              placeholder="Book title"
-              onChange={(e) =>
-                updateBook(book.id, {
-                  title: e.target.value,
-                })
-              }
-              onBlur={() => autofillBook(book.id, book.title)}
-              className="mb-2 w-full bg-transparent text-lg font-semibold outline-none"
-            />
-
-            <input
-              value={book.author || ""}
-              placeholder="Author"
-              onChange={(e) =>
-                updateBook(book.id, {
-                  author: e.target.value,
-                })
-              }
-              className="mb-4 w-full bg-transparent text-sm text-app-muted outline-none"
-            />
-
-            <select
-              value={book.status}
-              onChange={(e) =>
-                updateBook(book.id, {
-                  status: e.target.value,
-                })
-              }
-              className={`
-  mb-4
-  w-full
-  rounded-xl
-  border
-  border-app
-  p-2
-  text-sm
-  ${
-    book.status === "finished"
-      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-      : book.status === "reading"
-        ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
-        : "bg-app text-app-muted"
-  }
-`}
-            >
-              <option value="to_read">To Read</option>
-
-              <option value="reading">Reading</option>
-
-              <option value="finished">Finished</option>
-            </select>
-
-            <div className="mb-4">
-              <RatingStars
-                value={book.rating}
-                onChange={(rating) =>
-                  updateBook(book.id, {
-                    rating,
-                  })
-                }
-              />
-            </div>
-
-            <div className="mb-4">
-              <ProgressBar value={book.progress} />
-
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={book.progress}
-                onChange={(e) =>
-                  updateBook(book.id, {
-                    progress: Number(e.target.value),
-                  })
-                }
-                className="mt-2 w-full"
-              />
-            </div>
-
-            <TextareaAutosize
-              minRows={3}
-              value={book.notes || ""}
-              placeholder="Notes..."
-              onChange={(e) =>
-                updateBook(book.id, {
-                  notes: e.target.value,
-                })
-              }
-              className="mt-4 w-full resize-none rounded-xl border border-app bg-app p-3 text-sm outline-none"
-            />
-
-            {book.description && (
-              <p className="mt-4 line-clamp-4 text-sm text-app-muted">
-                {book.description}
-              </p>
-            )}
-
-            <div className="mt-4 flex gap-2">
-              {book.preview_url && (
-                <a
-                  href={book.preview_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary-app px-3 py-2 text-sm"
-                >
-                  Read Preview
-                </a>
-              )}
-
-              {book.info_url && (
-                <a
-                  href={book.info_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-xl border border-app px-3 py-2 text-sm"
-                >
-                  Details
-                </a>
-              )}
-            </div>
-
-            <input
-              type="file"
-              accept=".epub,.pdf,application/epub+zip,application/pdf"
-              onChange={(e) => uploadBookFile(book.id, e.target.files?.[0])}
-            />
-
-            {book.file_path && (
-              <Link
-                href={`/reader/${book.id}`}
-                className="btn-primary-app mt-4 inline-flex px-4 py-2 text-sm"
-              >
-                Open Reader
-              </Link>
-            )}
-
-            <button
-              onClick={() => deleteBook(book.id)}
-              className="mt-3 text-sm text-red-500 transition hover:text-red-600"
-            >
-              Delete
-            </button>
-          </div>
-        ))}
+      <div className="mb-4">
+        <ProgressBar value={book.progress} />
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={book.progress}
+          onChange={(e) =>
+            onUpdate(book.id, { progress: Number(e.target.value) })
+          }
+          className="mt-2 w-full"
+        />
       </div>
+
+      <TextareaAutosize
+        minRows={3}
+        value={book.notes || ""}
+        placeholder="Notes..."
+        onChange={(e) => onUpdate(book.id, { notes: e.target.value })}
+        className="mt-4 w-full resize-none rounded-xl border border-app bg-app p-3 text-sm outline-none"
+      />
+
+      {book.description && (
+        <p className="mt-4 line-clamp-2 text-sm text-app-muted">
+          {book.description}
+        </p>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        {book.preview_url && (
+          <a
+            href={book.preview_url}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary-app px-3 py-2 text-sm"
+          >
+            Read Preview
+          </a>
+        )}
+        {book.info_url && (
+          <a
+            href={book.info_url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-app px-3 py-2 text-sm"
+          >
+            Details
+          </a>
+        )}
+      </div>
+
+      <input
+        type="file"
+        accept=".epub,.pdf,application/epub+zip,application/pdf"
+        onChange={(e) => onUpload(book.id, e.target.files?.[0])}
+      />
+
+      {book.file_path && (
+        <Link
+          href={`/reader/${book.id}`}
+          className="btn-primary-app mt-4 inline-flex px-4 py-2 text-sm"
+        >
+          Open Reader
+        </Link>
+      )}
+
+      <button
+        onClick={() => onDelete(book.id)}
+        className="mt-3 text-sm text-red-500 transition hover:text-red-600"
+      >
+        Delete
+      </button>
     </div>
   );
 }

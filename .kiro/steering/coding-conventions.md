@@ -4,7 +4,7 @@
 
 - Strict mode is enabled. No `any`, no `!` non-null assertions unless unavoidable.
 - Use the generated `Database` type from `types/database.ts` for all Supabase queries.
-- Feature-specific types live in `types/*.ts` (e.g. `types/task.ts`, `types/note.ts`). Add new types there, not inline.
+- Feature-specific types live in `types/*.ts` (e.g. `types/task.ts`, `types/note.ts`, `types/document.ts`). Add new types there, not inline.
 - Prefer `type` over `interface` for object shapes.
 
 ## File & Component Naming
@@ -15,7 +15,7 @@
 
 ## Server vs Client Components
 
-- Pages in `app/` are **Server Components by default**. Keep them that way — fetch data at the top, pass props down.
+- Pages in `app/(app)/` are **Server Components by default**. Keep them that way — fetch data at the top, pass props down.
 - Add `"use client"` only when the component needs browser APIs, event handlers, or React state/effects.
 - Never call `createClient` from `@/lib/supabase/server` inside a `"use client"` component. Use `@/lib/supabase/client` there instead.
 
@@ -35,6 +35,13 @@
 ## Path Aliases
 
 - Always use `@/` for imports (maps to the repo root). Never use relative `../../` paths.
+
+## Testing
+
+- Test runner: **Vitest** with `@testing-library/react` and `jsdom`.
+- Property-based tests use **fast-check**.
+- Tests live in `__tests__/` (top-level) and `components/__tests__/`, `lib/__tests__/`.
+- Run tests with `npm run test` (single run) or `npm run test:watch` (watch mode).
 
 ## Linting & Formatting
 

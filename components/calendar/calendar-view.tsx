@@ -193,7 +193,7 @@ export function CalendarView({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app bg-app-surface p-4">
+      <div className="card-app flex flex-wrap items-center justify-between gap-3 p-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -267,7 +267,7 @@ export function CalendarView({
       {/* Main content */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         {/* Calendar grid */}
-        <div className={`rounded-2xl border border-app bg-app-surface p-4 ${loadingMonth ? "opacity-60" : ""}`}>
+        <div className={`card-app p-4 ${loadingMonth ? "opacity-60" : ""}`}>
           <CalendarGrid
             events={events}
             tasks={tasks}
@@ -280,7 +280,7 @@ export function CalendarView({
         {/* Side panel */}
         <div>
           {showCreateForm && (
-            <div className="rounded-2xl border border-app bg-app-surface p-6">
+            <div className="card-app p-6">
               <EventCreateForm
                 defaultDate={selectedDate || new Date()}
                 onCreated={handleEventCreated}
@@ -300,7 +300,7 @@ export function CalendarView({
           )}
 
           {!selectedDate && !showCreateForm && (
-            <div className="rounded-2xl border border-app bg-app-surface p-6">
+            <div className="card-app p-6">
               <p className="text-sm text-app-muted">
                 Select a date to view events and tasks.
               </p>

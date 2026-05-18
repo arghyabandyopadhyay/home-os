@@ -33,6 +33,7 @@ export function TodayTaskToggle({
       type="checkbox"
       checked={completed}
       onChange={(e) => toggle(e.target.checked)}
+      aria-label={completed ? "Mark task incomplete" : "Mark task complete"}
       className="h-4 w-4 shrink-0 rounded border-white/20"
     />
   );

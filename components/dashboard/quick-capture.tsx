@@ -73,8 +73,9 @@ export function QuickCapture() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="What's on your mind? Save as a task or note…"
+        aria-label="Quick capture — save as a task or note"
         rows={2}
-        className="mb-3 w-full resize-none rounded-xl border border-app bg-app-elevated px-4 py-3 text-sm text-app outline-none placeholder:text-app-muted focus:border-blue-500/40"
+        className="mb-3 w-full resize-none rounded-xl border border-app bg-app-elevated px-4 py-3 text-sm text-app placeholder:text-app-muted focus:border-blue-500/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--home-muted)]"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();

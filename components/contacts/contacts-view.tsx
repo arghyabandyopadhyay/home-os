@@ -12,8 +12,10 @@ import {
   Phone,
   Building2,
   User,
-  Briefcase,
   CheckSquare,
+  Users,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toDateKey } from "@/lib/date";
@@ -24,10 +26,11 @@ import { createContact, updateContact, deleteContact } from "@/lib/contacts";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { ContactDetail } from "@/components/contacts/contact-detail";
+import { EmptyState } from "@/components/shared/empty-state";
+
+const ITEMS_PER_SECTION = 5;
 
 interface Props {
   initialContacts: Contact[];
@@ -39,6 +42,8 @@ export function ContactsView({ initialContacts }: Props) {
   const [search, setSearch] = useState("");
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [showAllFavorites, setShowAllFavorites] = useState(false);
+  const [showAllContacts, setShowAllContacts] = useState(false);
 
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
@@ -53,6 +58,24 @@ export function ContactsView({ initialContacts }: Props) {
       );
     });
   }, [contacts, search]);
+
+  const favoriteContacts = useMemo(
+    () => filteredContacts.filter((c) => c.favorite),
+    [filteredContacts]
+  );
+
+  const otherContacts = useMemo(
+    () => filteredContacts.filter((c) => !c.favorite),
+    [filteredContacts]
+  );
+
+  const displayedFavorites = showAllFavorites
+    ? favoriteContacts
+    : favoriteContacts.slice(0, ITEMS_PER_SECTION);
+
+  const displayedOthers = showAllContacts
+    ? otherContacts
+    : otherContacts.slice(0, ITEMS_PER_SECTION);
 
   async function handleAddContact() {
     const optimisticContact: Contact = {
@@ -78,14 +101,14 @@ export function ContactsView({ initialContacts }: Props) {
 
       setContacts((prev) =>
         prev.map((contact) =>
-          contact.id === optimisticContact.id ? created : contact,
-        ),
+          contact.id === optimisticContact.id ? created : contact
+        )
       );
 
       toast.success("Contact created");
     } catch {
       setContacts((prev) =>
-        prev.filter((contact) => contact.id !== optimisticContact.id),
+        prev.filter((contact) => contact.id !== optimisticContact.id)
       );
 
       toast.error("Failed to create contact");
@@ -129,8 +152,8 @@ export function ContactsView({ initialContacts }: Props) {
               ...contact,
               ...updates,
             }
-          : contact,
-      ),
+          : contact
+      )
     );
 
     try {
@@ -158,303 +181,149 @@ export function ContactsView({ initialContacts }: Props) {
     }
   }
 
+  // Empty state when no contacts exist at all
+  if (contacts.length === 0) {
+    return (
+      <EmptyState
+        module="contacts"
+        icon={Users}
+        heading="Your contacts live here"
+        body="Add the people who matter to you — friends, colleagues, and collaborators."
+        actionLabel="Add Contact"
+        onAction={handleAddContact}
+      />
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-6 py-8 text-app">
-      {/* Header */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-semibold tracking-tight text-app">
-            Contacts
-          </h1>
-
-          <p className="text-sm text-app-muted">
-            People, relationships, and context.
-          </p>
+    <div className="space-y-8">
+      {/* Search bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search contacts..."
+            className="input-app h-11 pl-10"
+          />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" />
-
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search contacts..."
-              className="
-                h-11
-                rounded-xl
-                border-app
-                bg-white/5
-                pl-10
-                text-app
-                placeholder:text-app-muted
-                focus-visible:ring-0
-              "
-            />
-          </div>
-
-          <Button
-            onClick={handleAddContact}
-            className="
-              h-11
-              rounded-xl
-              bg-white
-              px-5
-              text-black
-              hover:bg-zinc-200
-            "
-          >
-            Add Contact
-          </Button>
-        </div>
+        <Button
+          onClick={handleAddContact}
+          className="btn-primary-app h-11 px-5"
+        >
+          Add Contact
+        </Button>
       </div>
 
-      {/* Empty State */}
-      {filteredContacts.length === 0 && (
-        <div className="flex h-52 items-center justify-center rounded-3xl border border-dashed border-app bg-app-surface/40 text-sm text-app-muted">
-          No contacts found.
+      {/* Empty search results */}
+      {filteredContacts.length === 0 && search && (
+        <div className="card-app flex h-52 items-center justify-center text-sm text-app-muted">
+          No contacts match your search.
         </div>
       )}
 
-      {/* Contacts Grid */}
-      <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
-        {filteredContacts.map((contact) => (
-          <Card
-            key={contact.id}
-            onClick={() => {
-              setSelectedContact(contact);
-              setDetailOpen(true);
-            }}
-            className="
-              cursor-pointer
-              rounded-3xl
-              border
-              border-app
-              bg-app-surface/70
-              shadow-2xl
-              backdrop-blur-xl
-              transition-all
-              hover:border-white/20
-              hover:bg-app-elevated
-            "
-          >
-            <CardContent className="space-y-6 p-6">
-              {/* Top Section */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-                    <User className="h-6 w-6 text-app/70" />
-                  </div>
+      {/* Favorites Section */}
+      {favoriteContacts.length > 0 && (
+        <section aria-label="Favorite contacts">
+          <div className="mb-4 flex items-center gap-2">
+            <Star className="h-4 w-4 text-yellow-400" />
+            <h2 className="text-sm uppercase tracking-[0.24em] text-app-muted">
+              Favorites
+            </h2>
+            <span className="rounded-full bg-app-elevated px-2 py-0.5 text-xs text-app-muted">
+              {favoriteContacts.length}
+            </span>
+          </div>
 
-                  <div className="space-y-1">
-                    <Input
-                      value={contact.name}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        handleUpdate(contact.id, {
-                          name: e.target.value,
-                        })
-                      }
-                      className="
-                        h-auto
-                        border-none
-                        bg-transparent
-                        p-0
-                        text-xl
-                        font-semibold
-                        text-app
-                        shadow-none
-                        placeholder:text-app-muted
-                        focus-visible:ring-0
-                      "
-                    />
-
-                    <p className="text-sm text-app-muted">
-                      {contact.role || "No role"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      createFollowUpTask(contact);
-                    }}
-                    className="rounded-lg border border-app p-2 text-app-muted transition hover:border-white/20 hover:text-app"
-                    title="Add follow-up task for today"
-                  >
-                    <CheckSquare className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUpdate(contact.id, {
-                        favorite: !contact.favorite,
-                      });
-                    }}
-                  >
-                    <Star
-                      className={`h-5 w-5 transition-colors ${
-                        contact.favorite
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-app-muted"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Info Fields */}
-              <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-                {/* Email */}
-                <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2">
-                  <Mail className="h-4 w-4 text-app-muted" />
-
-                  <Input
-                    value={contact.email || ""}
-                    onChange={(e) =>
-                      handleUpdate(contact.id, {
-                        email: e.target.value,
-                      })
-                    }
-                    placeholder="Email"
-                    className="
-                      border-none
-                      bg-transparent
-                      p-0
-                      text-sm
-                      text-app
-                      shadow-none
-                      placeholder:text-app-muted
-                      focus-visible:ring-0
-                    "
-                  />
-                </div>
-
-                {/* Phone */}
-                <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2">
-                  <Phone className="h-4 w-4 text-app-muted" />
-
-                  <Input
-                    value={contact.phone || ""}
-                    onChange={(e) =>
-                      handleUpdate(contact.id, {
-                        phone: e.target.value,
-                      })
-                    }
-                    placeholder="Phone"
-                    className="
-                      border-none
-                      bg-transparent
-                      p-0
-                      text-sm
-                      text-app
-                      shadow-none
-                      placeholder:text-app-muted
-                      focus-visible:ring-0
-                    "
-                  />
-                </div>
-
-                {/* Company */}
-                <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2">
-                  <Building2 className="h-4 w-4 text-app-muted" />
-
-                  <Input
-                    value={contact.company || ""}
-                    onChange={(e) =>
-                      handleUpdate(contact.id, {
-                        company: e.target.value,
-                      })
-                    }
-                    placeholder="Company"
-                    className="
-                      border-none
-                      bg-transparent
-                      p-0
-                      text-sm
-                      text-app
-                      shadow-none
-                      placeholder:text-app-muted
-                      focus-visible:ring-0
-                    "
-                  />
-                </div>
-
-                {/* Role */}
-                <div className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2">
-                  <Briefcase className="h-4 w-4 text-app-muted" />
-
-                  <Input
-                    value={contact.role || ""}
-                    onChange={(e) =>
-                      handleUpdate(contact.id, {
-                        role: e.target.value,
-                      })
-                    }
-                    placeholder="Role"
-                    className="
-                      border-none
-                      bg-transparent
-                      p-0
-                      text-sm
-                      text-app
-                      shadow-none
-                      placeholder:text-app-muted
-                      focus-visible:ring-0
-                    "
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <Textarea
-                value={contact.notes || ""}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) =>
-                  handleUpdate(contact.id, {
-                    notes: e.target.value,
-                  })
-                }
-                placeholder="Notes..."
-                rows={4}
-                className="
-                  resize-none
-                  rounded-2xl
-                  border-app
-                  bg-white/5
-                  text-app
-                  placeholder:text-app-muted
-                  focus-visible:ring-0
-                "
-              />
-
-              {/* Delete */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="
-                  w-full
-                  rounded-xl
-                  text-red-400
-                  hover:bg-red-500/10
-                  hover:text-red-300
-                "
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(contact.id);
+          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            {displayedFavorites.map((contact) => (
+              <ContactCard
+                key={contact.id}
+                contact={contact}
+                onSelect={() => {
+                  setSelectedContact(contact);
+                  setDetailOpen(true);
                 }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                onUpdate={handleUpdate}
+                onFollowUp={createFollowUpTask}
+              />
+            ))}
+          </div>
+
+          {favoriteContacts.length > ITEMS_PER_SECTION && (
+            <button
+              type="button"
+              onClick={() => setShowAllFavorites(!showAllFavorites)}
+              className="mt-3 flex items-center gap-1 text-sm text-app-muted transition hover:text-app"
+            >
+              {showAllFavorites ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Show all {favoriteContacts.length} favorites
+                </>
+              )}
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* All Contacts Section */}
+      {otherContacts.length > 0 && (
+        <section aria-label="All contacts">
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4 text-app-muted" />
+            <h2 className="text-sm uppercase tracking-[0.24em] text-app-muted">
+              All Contacts
+            </h2>
+            <span className="rounded-full bg-app-elevated px-2 py-0.5 text-xs text-app-muted">
+              {otherContacts.length}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {displayedOthers.map((contact) => (
+              <ContactListItem
+                key={contact.id}
+                contact={contact}
+                onSelect={() => {
+                  setSelectedContact(contact);
+                  setDetailOpen(true);
+                }}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onFollowUp={createFollowUpTask}
+              />
+            ))}
+          </div>
+
+          {otherContacts.length > ITEMS_PER_SECTION && (
+            <button
+              type="button"
+              onClick={() => setShowAllContacts(!showAllContacts)}
+              className="mt-3 flex items-center gap-1 text-sm text-app-muted transition hover:text-app"
+            >
+              {showAllContacts ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Show all {otherContacts.length} contacts
+                </>
+              )}
+            </button>
+          )}
+        </section>
+      )}
 
       {/* Contact Detail Sheet */}
       <ContactDetail
@@ -463,9 +332,8 @@ export function ContactsView({ initialContacts }: Props) {
         onOpenChange={setDetailOpen}
         onUpdate={(id, updates) => {
           handleUpdate(id, updates);
-          // Update the selected contact in the sheet as well
           setSelectedContact((prev) =>
-            prev && prev.id === id ? { ...prev, ...updates } : prev,
+            prev && prev.id === id ? { ...prev, ...updates } : prev
           );
         }}
         onDelete={(id) => {
@@ -473,6 +341,189 @@ export function ContactsView({ initialContacts }: Props) {
           setDetailOpen(false);
         }}
       />
+    </div>
+  );
+}
+
+// ─── Contact Card (card-app) for favorites grid ─────────────────────────────
+
+function ContactCard({
+  contact,
+  onSelect,
+  onUpdate,
+  onFollowUp,
+}: {
+  contact: Contact;
+  onSelect: () => void;
+  onUpdate: (id: string, updates: Partial<Contact>) => void;
+  onFollowUp: (contact: Contact) => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="card-app cursor-pointer p-6 transition-all"
+    >
+      {/* Top Section */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-elevated">
+            <User className="h-5 w-5 text-app-muted" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold text-app">
+              {contact.name}
+            </p>
+            <p className="truncate text-sm text-app-muted">
+              {contact.role || contact.company || "No role"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFollowUp(contact);
+            }}
+            className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+            aria-label="Add follow-up task"
+          >
+            <CheckSquare className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate(contact.id, { favorite: !contact.favorite });
+            }}
+            aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star
+              className={`h-4 w-4 transition-colors ${
+                contact.favorite
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-app-muted"
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Contact info */}
+      <div className="mt-4 space-y-2">
+        {contact.email && (
+          <div className="flex items-center gap-2 text-sm text-app-muted">
+            <Mail className="h-3.5 w-3.5" />
+            <span className="truncate">{contact.email}</span>
+          </div>
+        )}
+        {contact.phone && (
+          <div className="flex items-center gap-2 text-sm text-app-muted">
+            <Phone className="h-3.5 w-3.5" />
+            <span className="truncate">{contact.phone}</span>
+          </div>
+        )}
+        {contact.company && (
+          <div className="flex items-center gap-2 text-sm text-app-muted">
+            <Building2 className="h-3.5 w-3.5" />
+            <span className="truncate">{contact.company}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Contact List Item (item-app) for all contacts list ─────────────────────
+
+function ContactListItem({
+  contact,
+  onSelect,
+  onUpdate,
+  onDelete,
+  onFollowUp,
+}: {
+  contact: Contact;
+  onSelect: () => void;
+  onUpdate: (id: string, updates: Partial<Contact>) => void;
+  onDelete: (id: string) => void;
+  onFollowUp: (contact: Contact) => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className="item-app flex cursor-pointer items-center gap-4 p-4"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-elevated">
+        <User className="h-4 w-4 text-app-muted" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-app">{contact.name}</p>
+        <p className="truncate text-sm text-app-muted">
+          {contact.role && contact.company
+            ? `${contact.role} at ${contact.company}`
+            : contact.role || contact.company || contact.email || ""}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        {contact.email && (
+          <span className="hidden text-xs text-app-muted md:inline">
+            {contact.email}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFollowUp(contact);
+          }}
+          className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+          aria-label="Add follow-up task"
+        >
+          <CheckSquare className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUpdate(contact.id, { favorite: !contact.favorite });
+          }}
+          aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
+          className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+        >
+          <Star className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(contact.id);
+          }}
+          className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+          aria-label="Delete contact"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

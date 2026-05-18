@@ -22,6 +22,7 @@ import {
   Plus,
   Settings,
   File,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Book } from "@/types/book";
@@ -221,7 +222,11 @@ export function CommandMenu() {
     tasks.length > 0;
 
   return (
-    <CommandDialog open={open} onOpenChange={handleOpenChange}>
+    <CommandDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      className="rounded-2xl border-white/10 bg-app-surface/90 shadow-2xl backdrop-blur-2xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:duration-200 data-closed:duration-200"
+    >
       <CommandInput
         placeholder="Search or type a command…"
         value={search}
@@ -230,7 +235,16 @@ export function CommandMenu() {
 
       <CommandList>
         <CommandEmpty>
-          {loading ? "Searching…" : search ? "No results." : "Type to search your home."}
+          {loading ? (
+            "Searching…"
+          ) : search ? (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <Search className="h-8 w-8 text-app-muted" />
+              <span>No results found for &ldquo;{search}&rdquo;</span>
+            </div>
+          ) : (
+            "Type to search your home."
+          )}
         </CommandEmpty>
 
         {!search && (
@@ -262,7 +276,7 @@ export function CommandMenu() {
                 className="cursor-pointer"
               >
                 <LayoutDashboard className="mr-2 h-4 w-4" />
-                Today
+                Dashboard
               </CommandItem>
               <CommandItem
                 onSelect={() => handleSelect("/notes")}
@@ -364,7 +378,7 @@ export function CommandMenu() {
                     <BookOpen className="mr-2 h-4 w-4" />
                     <div className="flex flex-col">
                       <span>{book.title}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-app-muted">
                         {book.author}
                       </span>
                     </div>
@@ -384,7 +398,7 @@ export function CommandMenu() {
                     <Users className="mr-2 h-4 w-4" />
                     <div className="flex flex-col">
                       <span>{contact.name}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-app-muted">
                         {contact.email || contact.company}
                       </span>
                     </div>
@@ -404,7 +418,7 @@ export function CommandMenu() {
                     <CalendarDays className="mr-2 h-4 w-4" />
                     <div className="flex flex-col">
                       <span>{event.title}</span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-app-muted">
                         {new Date(event.starts_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -425,7 +439,7 @@ export function CommandMenu() {
                     <div className="flex flex-col">
                       <span>{doc.title}</span>
                       {(doc.tags ?? []).length > 0 && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-app-muted">
                           {(doc.tags ?? []).join(", ")}
                         </span>
                       )}

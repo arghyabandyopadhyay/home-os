@@ -17,6 +17,7 @@ export function MobileSidebar() {
           variant="ghost"
           size="icon"
           className="md:hidden"
+          aria-label="Open menu"
         >
           <Menu size={20} />
         </Button>
@@ -24,7 +25,7 @@ export function MobileSidebar() {
 
       <SheetContent
         side="left"
-        className="w-72 border-app bg-app p-0"
+        className="w-[272px] border-none bg-transparent p-0"
       >
         <Sidebar />
       </SheetContent>

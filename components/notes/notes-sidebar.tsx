@@ -14,6 +14,8 @@ import {
 import { usePreferences } from "@/components/providers/user-preferences-provider"
 import type { Note } from "@/types/note"
 
+const ITEMS_PER_PAGE = 5
+
 interface NotesSidebarProps {
   notes: Note[]
   activeNoteId?: string
@@ -31,6 +33,7 @@ export function NotesSidebar({
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // 300ms debounce for search
@@ -88,7 +91,7 @@ export function NotesSidebar({
   }
 
   return (
-    <div className="w-80 border-r border-app bg-app">
+    <div className="w-full">
       <div className="flex items-center justify-between border-b border-app p-4">
         <h1 className="text-lg font-semibold">Notes</h1>
         <button
@@ -157,7 +160,7 @@ export function NotesSidebar({
           </div>
         )}
 
-        {filteredNotes.map((note) => {
+        {(showAll ? filteredNotes : filteredNotes.slice(0, ITEMS_PER_PAGE)).map((note) => {
           const active = note.id === activeNoteId
           const isPinned = pinnedIds.includes(note.id)
 
@@ -165,10 +168,10 @@ export function NotesSidebar({
             <Link
               key={note.id}
               href={`/notes/${note.id}`}
-              className={`block rounded-xl border p-4 transition ${
+              className={`item-app block transition ${
                 active
                   ? "border-white/20 bg-app-elevated"
-                  : "border-app bg-app-surface hover:border-app hover:bg-app-elevated"
+                  : ""
               }`}
             >
               <div className="flex items-center gap-2">
@@ -180,9 +183,16 @@ export function NotesSidebar({
                 )}
               </div>
 
-              <p className="mt-2 text-sm text-app-muted">
+              <p className="mt-2 line-clamp-2 text-sm text-app-muted">
                 {truncatePreview(note.content, 120) || "Empty note"}
               </p>
+
+              <span className="mt-2 block text-xs text-app-muted">
+                {new Date(note.updated_at).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
 
               {(note.tags ?? []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -199,6 +209,24 @@ export function NotesSidebar({
             </Link>
           )
         })}
+
+        {!showAll && filteredNotes.length > ITEMS_PER_PAGE && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="link-muted w-full py-2 text-center text-sm"
+          >
+            Show all {filteredNotes.length} notes
+          </button>
+        )}
+
+        {showAll && filteredNotes.length > ITEMS_PER_PAGE && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="link-muted w-full py-2 text-center text-sm"
+          >
+            Show less
+          </button>
+        )}
       </div>
     </div>
   )
