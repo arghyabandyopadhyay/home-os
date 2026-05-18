@@ -1,5 +1,6 @@
 import { MobileSidebar } from "./mobile-sidebar";
 import { UserMenu } from "./user-menu";
+import { SearchTrigger } from "./search-trigger";
 
 export function Header() {
   return (
@@ -9,9 +10,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
-        <kbd className="hidden rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted sm:inline">
-          ⌘K
-        </kbd>
+        <SearchTrigger />
         <UserMenu />
       </div>
     </header>
