@@ -16,8 +16,8 @@ export default function AppLayout({
         <div className="absolute bottom-[-20%] right-[-10%] h-125 w-125 rounded-full bg-purple-500/10 blur-3xl dark:bg-purple-500/10" />
       </div>
 
-      <div className="relative min-h-screen">
-        <div className="fixed inset-y-0 left-0 z-40 hidden md:block">
+      <div className="relative min-h-screen safe-area-shell">
+        <div className="fixed inset-y-0 left-0 z-40 hidden md:block safe-area-sidebar">
           <Sidebar />
         </div>
         <div className="flex flex-1 flex-col md:ml-[272px]">
