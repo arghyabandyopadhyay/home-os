@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Update Docs on Source Change",
+  "description": "When source files (TypeScript, CSS, config) are edited, asks the agent to update the README or relevant documentation to reflect the changes.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "I'm about to git push. Review recent changes and update the README.md and the steering documents in .kiro/steering/ if any meaningful source changes (new features, API changes, config changes, structural changes, new modules, new routes, new conventions) have been made. Keep steering files accurate and in sync with the codebase. Then run git push."
+  }
+}
