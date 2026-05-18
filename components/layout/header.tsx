@@ -4,7 +4,7 @@ import { SearchTrigger } from "./search-trigger";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-app bg-app-surface/80 px-6 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-app bg-app-surface/80 px-6 pr-8 backdrop-blur-xl safe-area-header">
       <div className="flex items-center gap-4">
         <MobileSidebar />
       </div>

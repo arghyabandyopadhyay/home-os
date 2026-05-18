@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PreferencesSection } from "@/components/settings/preferences-section";
 import { GoogleIntegrationsSection } from "@/components/settings/google-integrations-section";
+import { InstallAppSection } from "@/components/settings/install-app-section";
 
 type ConnectionStatus = {
   connected: boolean;
@@ -388,6 +389,9 @@ export function SettingsClient({
         {/* Right Column */}
         <div className="space-y-6">
           <PreferencesSection />
+
+          {/* Install App */}
+          <InstallAppSection />
 
           {/* Export */}
           <div className="card-app p-6">

@@ -56,7 +56,7 @@ const items = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ closeButton }: { closeButton?: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -68,13 +68,16 @@ export function Sidebar() {
         WebkitBackdropFilter: "blur(16px)",
       }}
     >
-      <div className="p-6">
-        <h1 className="font-mono text-[1.25rem] font-semibold text-app">
-          Home OS
-        </h1>
-        <p className="mt-1 text-sm text-app-muted">
-          Mind · tasks · people · media
-        </p>
+      <div className="flex items-start justify-between p-6">
+        <div>
+          <h1 className="font-mono text-[1.25rem] font-semibold text-app">
+            Home OS
+          </h1>
+          <p className="mt-1 text-sm text-app-muted">
+            Mind · tasks · people · media
+          </p>
+        </div>
+        {closeButton}
       </div>
 
       <nav className="flex-1 space-y-2 px-4" aria-label="Main navigation">
