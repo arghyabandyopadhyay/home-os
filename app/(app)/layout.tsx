@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandMenu } from "@/components/layout/command-menu";
+import { FloatingSearchBar } from "@/components/layout/floating-search-bar";
 import { AppProviders } from "@/components/layout/app-providers";
 import { Toaster } from "sonner";
 
@@ -23,6 +24,7 @@ export default function AppLayout({
         <div className="flex flex-1 flex-col md:ml-[272px]">
           <Header />
           <CommandMenu />
+          <FloatingSearchBar />
           <div className="flex-1 bg-app">{children}</div>
         </div>
       </div>
