@@ -28,11 +28,13 @@ These are defined in `@layer components` in `globals.css`:
 | Class | Use for |
 |---|---|
 | `panel-app` | Large frosted-glass panels (e.g. dashboard header) |
-| `card-app` | Standard content cards |
+| `card-app` | Standard content cards (glassmorphism + hover) |
 | `item-app` | List items with hover state |
 | `input-app` | Text inputs and textareas |
 | `btn-primary-app` | Primary action buttons |
 | `link-muted` | Subtle navigation links |
+| `stat-card` | Stat/metric display cards |
+| `card-ambient-light` | Adds subtle radial gradient top-lighting to cards |
 
 **Do not** use raw Tailwind background/text color classes (`bg-white`, `text-gray-500`, etc.) for structural UI. Use the semantic classes above so light/dark mode works automatically.
 
@@ -61,11 +63,69 @@ These are defined in `@layer components` in `globals.css`:
 - Card internal padding: `p-6` for cards, `p-4` for list items.
 - Border radius: use Tailwind's `rounded-xl` (items), `rounded-2xl` (cards), `rounded-3xl` (panels). Avoid `rounded-full` except for avatars/badges.
 
-## Animations
+## Shared Components
 
-Framer Motion is available for transitions. Keep animations subtle:
-- Prefer `opacity` and `y` transforms, short durations (150–300ms).
-- Do not add animations to every element — reserve them for meaningful state changes (page transitions, modal open/close).
+Reusable UI primitives live in `components/shared/`:
+
+| Component | Use for |
+|---|---|
+| `EmptyState` | Zero-data states in any module (icon + heading + body + CTA) |
+| `FloatingToolbar` | Sticky contextual action bars (has `role="toolbar"`) |
+| `AppModal` | Standard modal dialog (uses Radix Dialog + `panel-app` styling) |
+
+Use these instead of building one-off equivalents per feature.
+
+## Animations & Motion System
+
+Framer Motion is available for transitions. A centralized motion config lives in `lib/motion.ts`.
+
+### Constraints (enforced by property tests)
+
+- Duration: 150–300ms for reveals, 150–200ms for hover
+- Easing: `ease-out` for entrances, `ease-in` for exits
+- Only animate `transform` and `opacity` — no layout-triggering properties
+- No spring/bounce physics
+- Displacement ≤ 30px, rotation ≤ 10°
+- Hover scale: 1.02–1.05, hover opacity shift ≤ 0.1
+
+### CSS Motion Tokens
+
+Defined in `globals.css` as custom properties:
+
+```
+--motion-duration-fast: 150ms
+--motion-duration-normal: 200ms
+--motion-duration-slow: 300ms
+--motion-easing-entrance: ease-out
+--motion-easing-exit: ease-in
+```
+
+Use these in component-class transitions rather than hardcoding values.
+
+### Usage
+
+Import presets from `lib/motion.ts`:
+```ts
+import { fadeReveal, staggerContainer, staggerItem, transitionEntrance } from "@/lib/motion"
+```
+
+For JS-driven animations, use the `useReducedMotion()` hook from `hooks/use-reduced-motion.ts` to skip animations when the user prefers reduced motion.
+
+## Performance Detection
+
+The app detects low-performance devices and degrades gracefully:
+
+- **Hook**: `useLowPerformance()` in `hooks/use-low-performance.ts` — detects low RAM (≤ 4 GB) or missing `backdrop-filter` support.
+- **Provider**: `LowPerformanceDetector` in `components/providers/` — adds `.low-perf` class to `<html>`.
+- **CSS fallbacks**: `globals.css` includes `html.low-perf` rules that disable backdrop-blur and use solid backgrounds.
+
+When `.low-perf` is active, avoid adding new backdrop-blur effects.
+
+## Reduced Motion
+
+- CSS: `@media (prefers-reduced-motion: reduce)` in `globals.css` disables all CSS transitions/animations globally (except focus indicators).
+- JS: `useReducedMotion()` hook returns `true` when OS-level reduced motion is enabled. Use it to set Framer Motion duration to 0.
+- Helper functions `getMotionTransition()` and `getMotionProps()` in the same file handle the pattern.
 
 ## Accessibility
 
@@ -73,3 +133,6 @@ Framer Motion is available for transitions. Keep animations subtle:
 - Use semantic HTML (`<nav>`, `<main>`, `<section>`, `<header>`, `<button>`, etc.).
 - Icon-only buttons must have an `aria-label`.
 - Color alone must not convey meaning — pair color with text or icons.
+- Navigation links use `aria-current="page"` for the active route.
+- Icons in navigation use `aria-hidden="true"`.
+- The `FloatingToolbar` component uses `role="toolbar"` with an `aria-label`.

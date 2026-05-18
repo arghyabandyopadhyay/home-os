@@ -24,8 +24,7 @@ import { Contact } from "@/types/contact";
 
 import { createContact, updateContact, deleteContact } from "@/lib/contacts";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+
 
 import { ContactDetail } from "@/components/contacts/contact-detail";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -198,23 +197,25 @@ export function ContactsView({ initialContacts }: Props) {
   return (
     <div className="space-y-8">
       {/* Search bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" />
-          <Input
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" aria-hidden="true" />
+          <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search contacts..."
-            className="input-app h-11 pl-10"
+            className="input-app w-full py-2.5 pl-10 pr-4 text-sm"
+            aria-label="Search contacts"
           />
         </div>
 
-        <Button
+        <button
           onClick={handleAddContact}
           className="btn-primary-app flex items-center gap-2 px-4 py-2.5 text-sm"
         >
+          <User className="h-4 w-4" aria-hidden="true" />
           Add Contact
-        </Button>
+        </button>
       </div>
 
       {/* Empty search results */}
