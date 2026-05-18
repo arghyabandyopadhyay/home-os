@@ -41,6 +41,7 @@ app/                    # Next.js App Router pages
 components/
   layout/               # Shell: sidebar, header, command menu, app-providers
   ui/                   # shadcn primitives
+  shared/               # Reusable UI primitives (EmptyState, FloatingToolbar, AppModal)
   auth/                 # Auth-related components
   calendar/             # Calendar feature components
   dashboard/            # Dashboard widgets
@@ -53,15 +54,18 @@ components/
   landing/              # Landing page components
   legal/                # Legal pages (privacy, terms)
   onboarding/           # Onboarding dialog
-  providers/            # React context providers
+  providers/            # React context providers (incl. LowPerformanceDetector)
   theme/                # Theme provider
 hooks/
   use-user-preferences.ts  # User preferences hook
+  use-reduced-motion.ts    # Reduced motion detection + Framer Motion helpers
+  use-low-performance.ts   # Low-performance device detection
 lib/
   supabase/
     client.ts           # Browser Supabase client
     server.ts           # Server Supabase client (async, uses cookies)
   auth/                 # Auth utility functions
+  motion.ts             # Centralized Framer Motion config (variants, transitions, constraints)
   *.ts                  # Feature-specific data access functions
 types/
   database.ts           # Auto-generated Supabase types

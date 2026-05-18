@@ -23,9 +23,10 @@ A calm personal organization platform built with Next.js. Home OS is a quiet spa
 | Tasks | `/tasks` |
 | Calendar | `/calendar` |
 | Library | `/library`, `/reader/[id]` |
-| Contacts | `/contacts`, `/contact` |
+| Contacts | `/contacts` |
 | Documents | `/documents`, `/documents/[id]` |
 | Settings | `/settings` |
+| Landing Page | `/` (public) |
 
 ## Getting Started
 
@@ -41,8 +42,11 @@ Create a `.env.local` file in the project root:
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
+NEXT_PUBLIC_SITE_URL=
+GOOGLE_CALENDAR_CLIENT_ID=
+GOOGLE_CALENDAR_CLIENT_SECRET=
+GOOGLE_CALENDAR_REDIRECT_URI=
+GOOGLE_BOOKS_API_KEY=
 ```
 
 ### Install & Run
@@ -62,25 +66,50 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run test` | Run tests (single run) |
+| `npm run test:watch` | Run tests in watch mode |
+
+## Testing
+
+Tests use **Vitest** with `@testing-library/react` and **fast-check** for property-based testing. Tests live in `__tests__/` organized by feature.
+
+```bash
+npm run test          # single run
+npm run test:watch    # watch mode
+```
 
 ## Project Structure
 
 ```
-app/            # Next.js App Router pages & API routes
-components/     # React components organized by feature
-  ui/           # shadcn/ui primitives
-  layout/       # Shell (sidebar, header, command menu)
-  notes/        # Notes feature
-  tasks/        # Tasks feature
-  calendar/     # Calendar feature
-  library/      # Library/reader feature
-  contacts/     # Contacts feature
-  settings/     # Settings feature
-lib/            # Data access & utility functions
-  supabase/     # Supabase client helpers (server & browser)
-types/          # TypeScript type definitions
+app/                    # Next.js App Router pages & API routes
+  (app)/                # Protected app shell (layout with sidebar + header)
+  (marketing)/          # Public marketing pages (landing)
+  api/                  # Route handlers
+  auth/callback/        # OAuth callback handler
+components/
+  ui/                   # shadcn/ui primitives
+  shared/               # Reusable UI (EmptyState, FloatingToolbar, AppModal)
+  layout/               # Shell (sidebar, header, command menu)
+  landing/              # Landing page components
+  auth/                 # Auth components
+  dashboard/            # Dashboard widgets
+  notes/                # Notes feature
+  tasks/                # Tasks feature
+  calendar/             # Calendar feature
+  library/              # Library/reader feature
+  contacts/             # Contacts feature
+  documents/            # Documents feature
+  settings/             # Settings feature
+  providers/            # Context providers
+hooks/                  # Custom React hooks
+lib/                    # Data access & utility functions
+  supabase/             # Supabase client helpers (server & browser)
+  auth/                 # Auth utilities
+  motion.ts             # Centralized animation config
+types/                  # TypeScript type definitions
 supabase/
-  migrations/   # SQL migration files
+  migrations/           # SQL migration files
+__tests__/              # Test files (Vitest + fast-check)
 ```
 
 ## Supabase
