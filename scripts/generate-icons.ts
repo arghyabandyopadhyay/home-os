@@ -19,8 +19,8 @@ const ROOT_DIR = resolve(dirname(new URL(import.meta.url).pathname), "..");
 const SOURCE_SVG = resolve(ROOT_DIR, "public/icons/icon-source.svg");
 const OUTPUT_DIR = resolve(ROOT_DIR, "public/icons");
 
-/** Standard PWA icon sizes */
-const ICON_SIZES = [72, 96, 128, 144, 152, 192, 384, 512] as const;
+/** Standard PWA icon sizes (includes 16 and 32 for favicon) */
+const ICON_SIZES = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512] as const;
 
 /** Apple touch icon size */
 const APPLE_TOUCH_ICON_SIZE = 180;

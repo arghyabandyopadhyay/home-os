@@ -59,7 +59,10 @@ export function CommandMenu() {
   const handleOpenChange = React.useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
-      if (!nextOpen) resetSearchState();
+      if (!nextOpen) {
+        resetSearchState();
+        window.dispatchEvent(new Event("close-command-menu"));
+      }
     },
     [resetSearchState],
   );
@@ -169,7 +172,7 @@ export function CommandMenu() {
 
   const handleSelect = (path: string) => {
     router.push(path);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   async function createNote() {
