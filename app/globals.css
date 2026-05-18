@@ -124,7 +124,7 @@
   --home-elevated: #fafafa;
   --home-border: rgba(0, 0, 0, 0.08);
   --home-text: #18181b;
-  --home-muted: #71717a;
+  --home-muted: #6d6d76;
   --home-accent-glow: rgba(59, 130, 246, 0.08);
 }
 
@@ -136,6 +136,16 @@
   --home-text: #fafafa;
   --home-muted: #a1a1aa;
   --home-accent-glow: rgba(59, 130, 246, 0.1);
+}
+
+/* Motion constraint tokens */
+:root {
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 200ms;
+  --motion-duration-slow: 300ms;
+  --motion-easing-entrance: ease-out;
+  --motion-easing-exit: ease-in;
+  --motion-easing-default: ease;
 }
 
 @layer utilities {
@@ -163,6 +173,18 @@
   .hover\:text-app:hover {
     color: var(--home-text);
   }
+  /* Radial gradient overlay for card ambient top-lighting */
+  .card-ambient-light {
+    position: relative;
+  }
+  .card-ambient-light::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(ellipse at top, rgba(255, 255, 255, 0.03), transparent);
+    pointer-events: none;
+  }
 }
 
 @layer components {
@@ -174,6 +196,13 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
   }
 
+  /* Solid fallback for browsers without backdrop-filter */
+  @supports not (backdrop-filter: blur(16px)) {
+    .panel-app {
+      background-color: var(--home-surface);
+    }
+  }
+
   .dark .panel-app {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   }
@@ -181,28 +210,116 @@
   .card-app {
     border-radius: 1rem;
     border: 1px solid var(--home-border);
-    background-color: var(--home-surface);
+    background-color: color-mix(in srgb, var(--home-surface) 70%, transparent);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    transition:
+      border-color var(--motion-duration-normal) var(--motion-easing-default),
+      background-color var(--motion-duration-slow) var(--motion-easing-default);
+  }
+
+  /* Solid fallback for browsers without backdrop-filter or when glassmorphism
+     reduces text contrast below 4.5:1 threshold */
+  @supports not (backdrop-filter: blur(16px)) {
+    .card-app {
+      background-color: var(--home-surface);
+    }
+  }
+
+  .dark .card-app {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  .card-app:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background-color: color-mix(in srgb, var(--home-surface) 100%, transparent);
+  }
+
+  .card-app:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+  }
+
+  :root:not(.dark) .card-app:hover {
+    border-color: rgba(0, 0, 0, 0.16);
   }
 
   .item-app {
     border-radius: 0.75rem;
     border: 1px solid var(--home-border);
     background-color: color-mix(in srgb, var(--home-elevated) 65%, transparent);
-    transition: background-color 0.15s ease;
+    transition: background-color var(--motion-duration-fast) var(--motion-easing-default);
+  }
+
+  /* Solid fallback for browsers without backdrop-filter */
+  @supports not (backdrop-filter: blur(16px)) {
+    .item-app {
+      background-color: var(--home-elevated);
+    }
   }
 
   .item-app:hover {
     background-color: var(--home-elevated);
   }
 
+  .item-app:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+  }
+
   .input-app {
     border-radius: 0.75rem;
-    border: 1px solid var(--home-border);
+    border: 1px solid color-mix(in srgb, var(--home-border) 100%, transparent);
     background-color: var(--home-elevated);
     color: var(--home-text);
+    transition: background-color var(--motion-duration-fast) var(--motion-easing-default);
   }
 
   .input-app::placeholder {
+    color: var(--home-muted);
+  }
+
+  .input-app:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
+  .input-app:focus {
+    background-color: color-mix(in srgb, var(--home-elevated) 100%, var(--home-surface));
+    border-color: var(--home-muted);
+  }
+
+  .dark .input-app:focus {
+    background-color: #27272a;
+  }
+
+  :root:not(.dark) .input-app:focus {
+    background-color: #f0f0f2;
+  }
+
+  .stat-card {
+    border-radius: 1rem;
+    border: 1px solid var(--home-border);
+    background-color: var(--home-surface);
+    padding: 1rem;
+  }
+
+  .stat-card:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+  }
+
+  .stat-card .stat-label {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     color: var(--home-muted);
   }
 
@@ -211,23 +328,137 @@
     background-color: var(--home-text);
     color: var(--home-bg);
     font-weight: 500;
-    transition: opacity 0.15s ease;
+    transition: opacity var(--motion-duration-fast) var(--motion-easing-default);
   }
 
   .btn-primary-app:hover {
     opacity: 0.9;
   }
 
+  .btn-primary-app:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+  }
+
   .link-muted {
     font-size: 0.875rem;
     line-height: 1.25rem;
     color: var(--home-muted);
-    transition: color 0.15s ease;
+    transition: color var(--motion-duration-fast) var(--motion-easing-default);
   }
 
   .link-muted:hover {
     color: var(--home-text);
   }
+
+  .link-muted:focus-visible {
+    outline: 2px solid var(--home-muted);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+}
+
+/* Reduced motion: disable all animations and transitions (except focus indicators) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Preserve focus indicators — they must remain visible for accessibility */
+  *:focus-visible {
+    outline-duration: 0s;
+    transition: none;
+  }
+
+  .card-app,
+  .item-app,
+  .input-app,
+  .btn-primary-app,
+  .link-muted {
+    transition: none !important;
+  }
+
+  .card-app:hover {
+    border-color: var(--home-border);
+    background-color: color-mix(in srgb, var(--home-surface) 70%, transparent);
+  }
+
+  .item-app:hover {
+    background-color: color-mix(in srgb, var(--home-elevated) 65%, transparent);
+  }
+}
+
+/* Low-performance fallbacks: JS-detected via .low-perf class on <html> */
+html.low-perf .panel-app,
+html.low-perf .card-app,
+html.low-perf .item-app {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.low-perf .panel-app {
+  background-color: var(--home-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+html.low-perf.dark .panel-app {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+html.low-perf .card-app {
+  background-color: var(--home-surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+html.low-perf.dark .card-app {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+html.low-perf .item-app {
+  background-color: var(--home-elevated);
+}
+
+/* CSS-only fallback for browsers that don't support backdrop-filter */
+@supports not (backdrop-filter: blur(1px)) {
+  .panel-app {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: var(--home-surface);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .panel-app {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-app {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: var(--home-surface);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .dark .card-app {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .item-app {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-color: var(--home-elevated);
+  }
+}
+
+/* Responsive safeguards: prevent overflow at all viewport widths (375px–2560px) */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 @layer base {

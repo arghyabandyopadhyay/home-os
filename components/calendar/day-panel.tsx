@@ -98,7 +98,7 @@ export function DayPanel({
 
   if (editingEvent) {
     return (
-      <div className="rounded-2xl border border-app bg-app-surface p-6">
+      <div className="card-app p-6">
         <EventEditForm
           event={editingEvent}
           onSave={(updated) => {
@@ -112,7 +112,7 @@ export function DayPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-app bg-app-surface p-6">
+    <div className="card-app p-6">
       <h3 className="mb-4 text-sm font-semibold text-app">{formattedDate}</h3>
 
       {/* Events section */}

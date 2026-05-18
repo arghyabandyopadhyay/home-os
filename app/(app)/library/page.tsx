@@ -14,7 +14,10 @@ export default async function LibraryPage() {
   const books = await getBooks();
 
   return (
-    <PageShell title="Library" description="Your personal reading space">
+    <PageShell
+      title="Library"
+      description="Your personal reading space"
+    >
       <LibraryView books={books} />
     </PageShell>
   );

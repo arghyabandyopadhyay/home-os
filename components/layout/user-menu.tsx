@@ -49,7 +49,10 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-semibold text-black transition hover:opacity-90">
+        <button
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-semibold text-black transition hover:opacity-90"
+          aria-label="User menu"
+        >
           {getInitials()}
         </button>
       </DropdownMenuTrigger>

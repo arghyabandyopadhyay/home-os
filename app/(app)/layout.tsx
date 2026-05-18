@@ -16,14 +16,14 @@ export default function AppLayout({
         <div className="absolute bottom-[-20%] right-[-10%] h-125 w-125 rounded-full bg-purple-500/10 blur-3xl dark:bg-purple-500/10" />
       </div>
 
-      <div className="relative flex min-h-screen">
-        <div className="hidden md:block">
+      <div className="relative min-h-screen">
+        <div className="fixed inset-y-0 left-0 z-40 hidden md:block">
           <Sidebar />
         </div>
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col md:ml-[272px]">
           <Header />
           <CommandMenu />
-          <main className="flex-1 bg-app">{children}</main>
+          <div className="flex-1 bg-app">{children}</div>
         </div>
       </div>
       <Toaster richColors position="top-right" />

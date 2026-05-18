@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PageShell } from "@/components/layout/page-shell";
 import { SettingsClient } from "@/components/settings/settings-client";
 
 export default async function SettingsPage() {
@@ -38,9 +39,14 @@ export default async function SettingsPage() {
   };
 
   return (
-    <SettingsClient
-      calendarConnection={calendarConnection}
-      contactsConnection={contactsConnection}
-    />
+    <PageShell
+      title="Settings"
+      description="Manage your account, preferences and workspace"
+    >
+      <SettingsClient
+        calendarConnection={calendarConnection}
+        contactsConnection={contactsConnection}
+      />
+    </PageShell>
   );
 }

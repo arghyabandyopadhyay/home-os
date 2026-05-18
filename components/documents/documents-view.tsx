@@ -364,9 +364,9 @@ export function DocumentsView({
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty state - handled at page level, this is a fallback */}
       {documents.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-app p-16 text-center text-app-muted">
+        <div className="card-app p-16 text-center text-app-muted">
           No documents yet. Upload a PDF to get started.
         </div>
       )}

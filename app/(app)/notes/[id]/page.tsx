@@ -1,6 +1,9 @@
 import { getNote, getNotes } from "@/lib/notes";
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NotesSidebar } from "@/components/notes/notes-sidebar";
+import { PageShell } from "@/components/layout/page-shell";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 
 export default async function NotePage({
   params,
@@ -13,25 +16,52 @@ export default async function NotePage({
 
   if (!note) {
     return (
-      <div className="relative min-h-screen bg-app text-app flex items-center justify-center p-10">
-        <div className="rounded-3xl border border-app panel-app p-10 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-          Note not found
+      <PageShell title="Notes" description="A quiet space for your thoughts">
+        <div className="flex items-center justify-center py-20">
+          <div className="card-app p-10 text-center">
+            <p className="text-app-muted">
+              This note could not be found. It may have been deleted.
+            </p>
+            <Link
+              href="/notes"
+              className="btn-primary-app mt-4 inline-block px-4 py-2 text-sm"
+            >
+              Back to notes
+            </Link>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-app text-app">
-      <div className="flex h-[calc(100vh-64px)]">
-        <NotesSidebar notes={notes} activeNoteId={id} />
+    <PageShell
+      title="Notes"
+      description="A quiet space for your thoughts"
+      actions={
+        <Link
+          href="/notes"
+          className="btn-primary-app inline-flex items-center gap-2 px-4 py-2 text-sm"
+          aria-label="Create new note"
+        >
+          <Plus className="h-4 w-4" />
+          New note
+        </Link>
+      }
+    >
+      <div className="flex gap-6">
+        <div className="hidden w-80 shrink-0 md:block">
+          <div className="card-app overflow-hidden p-0">
+            <NotesSidebar notes={notes} activeNoteId={id} />
+          </div>
+        </div>
 
-        <div className="flex-1 px-6 py-10">
-          <div className="rounded-3xl border border-app panel-app p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+        <div className="min-w-0 flex-1 lg:w-[70%]">
+          <div className="card-app overflow-hidden p-0">
             <NoteEditor note={note} />
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

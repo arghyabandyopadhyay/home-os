@@ -5,9 +5,10 @@ import { createClient } from "@/lib/supabase/client"
 import { Task } from "@/types/task"
 import { groupTasksBySection, countTodayIncomplete } from "@/lib/tasks-helpers"
 import { toast } from "sonner"
-import { Plus, Calendar } from "lucide-react"
+import { Calendar, CheckSquare, ChevronDown } from "lucide-react"
 import { v4 as uuid } from "uuid"
 import { formatDueLabel } from "@/lib/date"
+import { EmptyState } from "@/components/shared/empty-state"
 
 // ─── Priority helpers ─────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ function TaskRow({
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-2xl border border-app bg-app-surface p-4">
+    <div className="item-app flex flex-col gap-1">
       <div className="flex items-center gap-3">
         <input
           type="checkbox"
@@ -196,10 +197,22 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
   const [tasks, setTasks] = useState<LocalTask[]>(initialTasks)
   const tasksRef = useRef<LocalTask[]>(initialTasks)
   const [viewMode, setViewMode] = useState<"today" | "all">("all")
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+
+  const ITEMS_PER_SECTION = 5
 
   useEffect(() => {
     tasksRef.current = tasks
   }, [tasks])
+
+  // Listen for create task event from the page header action button
+  useEffect(() => {
+    function handleCreateEvent() {
+      createTask()
+    }
+    window.addEventListener("tasks:create", handleCreateEvent)
+    return () => window.removeEventListener("tasks:create", handleCreateEvent)
+  })
 
   const today = new Date()
   const sections = groupTasksBySection(tasks, today)
@@ -362,102 +375,145 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
     onDelete: deleteTask,
   }
 
+  // ── Progressive disclosure helper ─────────────────────────────────────────
+
+  function toggleSection(section: string) {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
+  }
+
+  function getVisibleItems(items: LocalTask[], section: string) {
+    if (expandedSections[section]) return items
+    return items.slice(0, ITEMS_PER_SECTION)
+  }
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+
+  if (tasks.length === 0) {
+    return (
+      <EmptyState
+        module="tasks"
+        icon={CheckSquare}
+        heading="Your tasks live here"
+        body="Capture what needs doing — from daily errands to long-term goals. Start with your first task."
+        actionLabel="Create your first task"
+        onAction={createTask}
+      />
+    )
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {/* Header bar */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-sm uppercase tracking-[0.24em] text-app-muted">
-            Your tasks
-          </span>
+      <div className="flex items-center gap-3">
+        <span className="text-sm uppercase tracking-[0.24em] text-app-muted">
+          Your tasks
+        </span>
 
-          {/* Today / All toggle */}
-          <div className="flex rounded-xl border border-app overflow-hidden">
-            <button
-              onClick={() => setViewMode("today")}
-              className={`px-3 py-1.5 text-xs transition ${
-                viewMode === "today"
-                  ? "bg-app-elevated text-app"
-                  : "text-app-muted hover:text-app"
-              }`}
-            >
-              Today
-              {todayCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-app px-1.5 py-0.5 text-xs text-app-muted">
-                  {todayCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setViewMode("all")}
-              className={`px-3 py-1.5 text-xs transition ${
-                viewMode === "all"
-                  ? "bg-app-elevated text-app"
-                  : "text-app-muted hover:text-app"
-              }`}
-            >
-              All
-            </button>
-          </div>
+        {/* Today / All toggle */}
+        <div className="flex overflow-hidden rounded-xl border border-app">
+          <button
+            onClick={() => setViewMode("today")}
+            className={`px-3 py-1.5 text-xs transition ${
+              viewMode === "today"
+                ? "bg-app-elevated text-app"
+                : "text-app-muted hover:text-app"
+            }`}
+          >
+            Today
+            {todayCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-app px-1.5 py-0.5 text-xs text-app-muted">
+                {todayCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setViewMode("all")}
+            className={`px-3 py-1.5 text-xs transition ${
+              viewMode === "all"
+                ? "bg-app-elevated text-app"
+                : "text-app-muted hover:text-app"
+            }`}
+          >
+            All
+          </button>
         </div>
-
-        <button
-          onClick={createTask}
-          className="btn-primary-app flex items-center gap-2 px-4 py-3"
-        >
-          <Plus size={18} aria-hidden="true" />
-          Add Task
-        </button>
       </div>
 
       {/* Today section */}
-      <section aria-label="Today's tasks">
+      <section aria-label="Today's tasks" className="card-app p-6">
         <SectionHeader label="Today" count={todayCount} />
         {visibleSections.today.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
+          <div className="rounded-xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
             You&apos;re all caught up for today.
           </div>
         ) : (
           <div className="space-y-2">
-            {visibleSections.today.map((task) => (
+            {getVisibleItems(visibleSections.today, "today").map((task) => (
               <TaskRow key={task.id} task={task} {...rowProps} />
             ))}
+            {visibleSections.today.length > ITEMS_PER_SECTION && !expandedSections["today"] && (
+              <button
+                onClick={() => toggleSection("today")}
+                className="flex w-full items-center justify-center gap-1 rounded-xl py-2 text-xs text-app-muted transition hover:text-app"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                Show {visibleSections.today.length - ITEMS_PER_SECTION} more
+              </button>
+            )}
           </div>
         )}
       </section>
 
       {/* Upcoming section — hidden in Today mode */}
       {viewMode === "all" && (
-        <section aria-label="Upcoming tasks" className="pt-4">
+        <section aria-label="Upcoming tasks" className="card-app p-6">
           <SectionHeader label="Upcoming" />
           {visibleSections.upcoming.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
+            <div className="rounded-xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
               No upcoming tasks.
             </div>
           ) : (
             <div className="space-y-2">
-              {visibleSections.upcoming.map((task) => (
+              {getVisibleItems(visibleSections.upcoming, "upcoming").map((task) => (
                 <TaskRow key={task.id} task={task} {...rowProps} />
               ))}
+              {visibleSections.upcoming.length > ITEMS_PER_SECTION && !expandedSections["upcoming"] && (
+                <button
+                  onClick={() => toggleSection("upcoming")}
+                  className="flex w-full items-center justify-center gap-1 rounded-xl py-2 text-xs text-app-muted transition hover:text-app"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Show {visibleSections.upcoming.length - ITEMS_PER_SECTION} more
+                </button>
+              )}
             </div>
           )}
         </section>
       )}
 
       {/* Completed section */}
-      <section aria-label="Completed tasks" className="pt-4">
+      <section aria-label="Completed tasks" className="card-app p-6">
         <SectionHeader label="Completed" />
         {visibleSections.completed.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
+          <div className="rounded-xl border border-dashed border-app p-6 text-center text-sm text-app-muted">
             No completed tasks yet.
           </div>
         ) : (
           <div className="space-y-2">
-            {visibleSections.completed.map((task) => (
+            {getVisibleItems(visibleSections.completed, "completed").map((task) => (
               <TaskRow key={task.id} task={task} {...rowProps} />
             ))}
+            {visibleSections.completed.length > ITEMS_PER_SECTION && !expandedSections["completed"] && (
+              <button
+                onClick={() => toggleSection("completed")}
+                className="flex w-full items-center justify-center gap-1 rounded-xl py-2 text-xs text-app-muted transition hover:text-app"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                Show {visibleSections.completed.length - ITEMS_PER_SECTION} more
+              </button>
+            )}
           </div>
         )}
       </section>
