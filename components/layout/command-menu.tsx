@@ -77,6 +77,12 @@ export function CommandMenu() {
   }, []);
 
   React.useEffect(() => {
+    const handleOpenEvent = () => setOpen(true);
+    window.addEventListener("open-command-menu", handleOpenEvent);
+    return () => window.removeEventListener("open-command-menu", handleOpenEvent);
+  }, []);
+
+  React.useEffect(() => {
     if (!open) {
       return;
     }
@@ -223,6 +229,7 @@ export function CommandMenu() {
 
   return (
     <CommandDialog
+      shouldFilter={false}
       open={open}
       onOpenChange={handleOpenChange}
       className="rounded-2xl border-white/10 bg-app-surface/90 shadow-2xl backdrop-blur-2xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:duration-200 data-closed:duration-200"
