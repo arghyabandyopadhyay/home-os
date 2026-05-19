@@ -153,7 +153,7 @@ export function MobileShell({ children }: MobileShellProps) {
     useImmersiveViewport()
   const prefersReducedMotion = useReducedMotion()
   const isLowPerf = useLowPerformance()
-  const scrollDirection = useScrollDirection()
+  const scrollDirection = useScrollDirection({ threshold: 8 })
   const pathname = usePathname()
 
   // Derived: animations should be disabled when reduced motion or low-perf

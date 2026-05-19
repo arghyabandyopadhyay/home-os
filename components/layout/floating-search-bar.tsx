@@ -249,7 +249,7 @@ export function FloatingSearchBar() {
     <motion.div
       className="fixed left-1/2 z-50 -translate-x-1/2"
       style={{
-        bottom: "calc(24px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height, 0px))",
+        bottom: "calc(36px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height, 0px))",
         pointerEvents: isScrollHidden ? "none" : "auto",
       }}
       variants={entranceVariants}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import type { Transition } from "framer-motion"
+import Link from "next/link"
 
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
@@ -11,7 +12,6 @@ import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { useImmersiveContext } from "@/components/layout/mobile-shell"
 import { DURATION, EASING } from "@/lib/motion"
 
-import { MobileSidebar } from "./mobile-sidebar"
 import { UserMenu } from "./user-menu"
 import { SearchTrigger } from "./search-trigger"
 
@@ -39,11 +39,12 @@ export const headerHideTransition: Transition = {
 }
 
 /**
- * Show transition config: ease-out, 200ms.
+ * Show transition config: ease-out, 150ms.
  * Used when the header translates back into view on scroll up.
+ * Faster than hide for a snappy, responsive reveal.
  */
 export const headerShowTransition: Transition = {
-  duration: DURATION.normal,
+  duration: DURATION.fast,
   ease: EASING.entrance,
 }
 
@@ -140,7 +141,9 @@ export function Header() {
       transition={scrollTransition}
     >
       <div className="flex items-center gap-4">
-        <MobileSidebar />
+        <Link href="/dashboard" className="font-mono text-base font-semibold tracking-tight text-app md:hidden">
+          Home OS
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">

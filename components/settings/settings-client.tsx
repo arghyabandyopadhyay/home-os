@@ -429,6 +429,19 @@ export function SettingsClient({
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
+
+          {/* Legal Links */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 px-1">
+            <a href="/privacy" className="text-xs link-muted">
+              Privacy
+            </a>
+            <a href="/terms" className="text-xs link-muted">
+              Terms
+            </a>
+            <a href="/contact" className="text-xs link-muted">
+              Contact
+            </a>
+          </div>
         </div>
       </div>
     </div>
