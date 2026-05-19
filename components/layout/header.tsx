@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import type { Transition } from "framer-motion"
 
@@ -16,6 +17,8 @@ import { SearchTrigger } from "./search-trigger"
 /**
  * The translateY displacement when hidden (px, negative = upward).
  * Calculated as: height (64px / h-16) + border (1px) + shadow buffer (3px) = 68px.
+ * Kept exported for backward compatibility. The component internally uses a
+ * dynamic value read from the CSS custom property `--header-hide-y`.
  */
 export const HEADER_HIDE_DISPLACEMENT = -68
 
@@ -44,10 +47,27 @@ export const headerShowTransition: Transition = {
 }
 
 export function Header() {
+  const headerRef = useRef<HTMLElement>(null)
+  const [hideDisplacement, setHideDisplacement] = useState(HEADER_HIDE_DISPLACEMENT)
+
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
   const isLowPerf = useLowPerformance()
   const scrollDirection = useScrollDirection({ threshold: HEADER_SCROLL_THRESHOLD })
+
+  // Read the dynamic --header-hide-y CSS custom property after mount
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+
+    const raw = getComputedStyle(el).getPropertyValue("--header-hide-y").trim()
+    if (raw) {
+      const parsed = parseFloat(raw)
+      if (!Number.isNaN(parsed)) {
+        setHideDisplacement(parsed)
+      }
+    }
+  }, [])
 
   // Only hide on mobile when scrolling down
   const isScrollHidden = isMobile && scrollDirection === "down"
@@ -65,9 +85,10 @@ export function Header() {
 
   return (
     <motion.header
-      className="fixed top-0 left-0 right-0 z-40 flex h-16 items-center justify-between border-b border-app bg-app-surface/80 px-6 pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
+      ref={headerRef}
+      className="fixed top-0 left-0 right-0 z-40 flex md:h-16 items-center justify-between border-b border-app bg-app-surface/80 px-6 pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
       style={{ pointerEvents }}
-      animate={{ y: isScrollHidden ? HEADER_HIDE_DISPLACEMENT : 0 }}
+      animate={{ y: isScrollHidden ? hideDisplacement : 0 }}
       transition={scrollTransition}
     >
       <div className="flex items-center gap-4">
