@@ -2,6 +2,8 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandMenu } from "@/components/layout/command-menu";
 import { FloatingSearchBar } from "@/components/layout/floating-search-bar";
+import { MobileShell } from "@/components/layout/mobile-shell";
+import { BottomNav } from "@/components/layout/bottom-nav";
 import { AppProviders } from "@/components/layout/app-providers";
 import { Toaster } from "sonner";
 
@@ -22,10 +24,18 @@ export default function AppLayout({
           <Sidebar />
         </div>
         <div className="flex flex-1 flex-col md:ml-[272px]">
-          <Header />
-          <CommandMenu />
-          <FloatingSearchBar />
-          <div className="flex-1 bg-app">{children}</div>
+          <MobileShell>
+            <Header />
+            <CommandMenu />
+            <FloatingSearchBar />
+            <main
+              className="flex-1 bg-app overflow-y-auto pb-[var(--bottom-nav-height,0px)] md:pb-0"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {children}
+            </main>
+            <BottomNav />
+          </MobileShell>
         </div>
       </div>
       <Toaster richColors position="top-right" />

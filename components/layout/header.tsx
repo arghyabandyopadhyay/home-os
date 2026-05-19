@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import { useLowPerformance } from "@/hooks/use-low-performance"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
+import { useImmersiveContext } from "@/components/layout/mobile-shell"
 import { DURATION, EASING } from "@/lib/motion"
 
 import { MobileSidebar } from "./mobile-sidebar"
@@ -46,14 +47,23 @@ export const headerShowTransition: Transition = {
   ease: EASING.entrance,
 }
 
+/**
+ * Idle duration (ms) after which will-change is removed from the header.
+ */
+const WILL_CHANGE_IDLE_MS = 500
+
 export function Header() {
   const headerRef = useRef<HTMLElement>(null)
+  const willChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [hideDisplacement, setHideDisplacement] = useState(HEADER_HIDE_DISPLACEMENT)
 
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
   const isLowPerf = useLowPerformance()
   const scrollDirection = useScrollDirection({ threshold: HEADER_SCROLL_THRESHOLD })
+
+  // Try to read ImmersiveContext (available when inside MobileShell on mobile)
+  const immersiveContext = useImmersiveContext()
 
   // Read the dynamic --header-hide-y CSS custom property after mount
   useEffect(() => {
@@ -69,19 +79,57 @@ export function Header() {
     }
   }, [])
 
-  // Only hide on mobile when scrolling down
-  const isScrollHidden = isMobile && scrollDirection === "down"
+  // Determine visibility:
+  // If ImmersiveContext is available (mobile inside MobileShell), use context-driven state.
+  // Otherwise, fall back to local scroll direction (desktop or outside MobileShell).
+  const isScrollHidden = immersiveContext
+    ? !immersiveContext.chromeVisible
+    : isMobile && scrollDirection === "down"
+
+  // Determine whether animations should be enabled:
+  // If context is available, use its shouldAnimate flag (already accounts for reduced motion + low-perf).
+  // Otherwise, fall back to local hook checks.
+  const shouldAnimate = immersiveContext
+    ? immersiveContext.shouldAnimate
+    : !prefersReducedMotion && !isLowPerf
+
+  // Manage will-change lifecycle: apply during transitions, remove after idle
+  useEffect(() => {
+    if (!isMobile) return
+
+    const el = headerRef.current
+    if (!el) return
+
+    // Apply will-change when transitioning
+    el.style.willChange = "transform"
+
+    // Clear any existing timeout
+    if (willChangeTimeoutRef.current !== null) {
+      clearTimeout(willChangeTimeoutRef.current)
+    }
+
+    // Remove will-change after idle period
+    willChangeTimeoutRef.current = setTimeout(() => {
+      el.style.willChange = "auto"
+      willChangeTimeoutRef.current = null
+    }, WILL_CHANGE_IDLE_MS)
+
+    return () => {
+      if (willChangeTimeoutRef.current !== null) {
+        clearTimeout(willChangeTimeoutRef.current)
+      }
+    }
+  }, [isScrollHidden, isMobile])
 
   // Determine pointer-events based on visibility state
   const pointerEvents = isScrollHidden ? "none" : "auto"
 
   // Determine transition (degraded mode = instant)
-  const scrollTransition =
-    prefersReducedMotion || isLowPerf
-      ? { duration: 0 }
-      : isScrollHidden
-        ? headerHideTransition
-        : headerShowTransition
+  const scrollTransition = !shouldAnimate
+    ? { duration: 0 }
+    : isScrollHidden
+      ? headerHideTransition
+      : headerShowTransition
 
   return (
     <motion.header
