@@ -105,6 +105,7 @@ function TaskRow({
 
   return (
     <div className="item-app flex flex-col gap-1">
+      {/* Primary row: checkbox + title (+ controls on desktop) */}
       <div className="flex items-center gap-3">
         <input
           type="checkbox"
@@ -131,7 +132,7 @@ function TaskRow({
           }`}
         />
 
-        {/* Priority selector */}
+        {/* Desktop-only controls */}
         <select
           value={task.priority ?? ""}
           onChange={(e) =>
@@ -140,7 +141,7 @@ function TaskRow({
               (e.target.value as Priority) || null,
             )
           }
-          className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
+          className="hidden shrink-0 rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted sm:block"
           aria-label="Task priority"
         >
           <option value="">No priority</option>
@@ -149,8 +150,7 @@ function TaskRow({
           <option value="high">High</option>
         </select>
 
-        {/* Due date */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
           <input
             type="date"
             value={task.due_date?.slice(0, 10) ?? ""}
@@ -174,7 +174,56 @@ function TaskRow({
 
         <button
           onClick={() => onDelete(task.id)}
-          className="shrink-0 text-sm text-red-400 transition hover:text-red-300"
+          className="hidden shrink-0 text-sm text-red-400 transition hover:text-red-300 sm:block"
+          aria-label="Delete task"
+        >
+          Delete
+        </button>
+      </div>
+
+      {/* Mobile-only controls row */}
+      <div className="ml-8 flex flex-wrap items-center gap-2 sm:hidden">
+        <select
+          value={task.priority ?? ""}
+          onChange={(e) =>
+            onUpdatePriority(
+              task.id,
+              (e.target.value as Priority) || null,
+            )
+          }
+          className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
+          aria-label="Task priority"
+        >
+          <option value="">No priority</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <input
+          type="date"
+          value={task.due_date?.slice(0, 10) ?? ""}
+          onChange={(e) =>
+            onUpdateDueDate(
+              task.id,
+              e.target.value ? `${e.target.value}T12:00:00` : null,
+            )
+          }
+          className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
+          title="Due date"
+          aria-label="Due date"
+        />
+
+        {task.due_date && (
+          <span className="flex items-center gap-1 text-xs text-app-muted">
+            <Calendar className="h-3 w-3" aria-hidden="true" />
+            {formatDueLabel(task.due_date)}
+          </span>
+        )}
+
+        <button
+          onClick={() => onDelete(task.id)}
+          className="text-sm text-red-400 transition hover:text-red-300"
           aria-label="Delete task"
         >
           Delete
