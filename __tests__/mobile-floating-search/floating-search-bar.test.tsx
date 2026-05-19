@@ -18,8 +18,21 @@ vi.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => mockUseReducedMotion(),
 }))
 
+// Mock useLowPerformance hook
+const mockUseLowPerformance = vi.fn(() => false)
+vi.mock("@/hooks/use-low-performance", () => ({
+  useLowPerformance: () => mockUseLowPerformance(),
+}))
+
+// Mock useScrollDirection hook
+const mockUseScrollDirection = vi.fn(() => null)
+vi.mock("@/hooks/use-scroll-direction", () => ({
+  useScrollDirection: () => mockUseScrollDirection(),
+}))
+
 // Mock framer-motion to render plain elements and expose animation callbacks
 let lastAnimationCompleteCallback: ((variant: string) => void) | null = null
+let entranceAnimationCompleteCallback: (() => void) | null = null
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -45,8 +58,13 @@ vi.mock("framer-motion", () => ({
     },
     div: ({
       children,
+      onAnimationComplete,
       ...props
-    }: React.PropsWithChildren<{ [key: string]: unknown }>) => {
+    }: React.PropsWithChildren<{ onAnimationComplete?: () => void; [key: string]: unknown }>) => {
+      // Capture the entrance animation complete callback (the one on the outer div with variants)
+      if (onAnimationComplete && (props as Record<string, unknown>).variants) {
+        entranceAnimationCompleteCallback = onAnimationComplete
+      }
       const {
         variants,
         transition,
@@ -66,7 +84,10 @@ describe("FloatingSearchBar", () => {
     vi.useFakeTimers()
     mockUseIsMobile.mockReturnValue(true)
     mockUseReducedMotion.mockReturnValue(false)
+    mockUseLowPerformance.mockReturnValue(false)
+    mockUseScrollDirection.mockReturnValue(null)
     lastAnimationCompleteCallback = null
+    entranceAnimationCompleteCallback = null
     dispatchEventSpy = vi.spyOn(window, "dispatchEvent")
   })
 

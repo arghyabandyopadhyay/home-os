@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 import { Contact } from "@/types/contact";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import { CallButton } from "@/components/contacts/call-button";
 
 import {
   Sheet,
@@ -52,6 +54,7 @@ export function ContactDetail({
 }: ContactDetailProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<Contact>>({});
+  const isMobile = useIsMobile();
 
   if (!contact) return null;
 
@@ -231,7 +234,10 @@ export function ContactDetail({
               {contact.phone && (
                 <div className="flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3">
                   <Phone className="h-4 w-4 text-app-muted" />
-                  <span className="text-sm text-app">{contact.phone}</span>
+                  <span className="text-sm text-app flex-1">{contact.phone}</span>
+                  {isMobile && !isEditing && (
+                    <CallButton phone={contact.phone} contactName={contact.name} />
+                  )}
                 </div>
               )}
 
