@@ -27,7 +27,9 @@ import { createContact, updateContact, deleteContact } from "@/lib/contacts";
 
 
 import { ContactDetail } from "@/components/contacts/contact-detail";
+import { CallButton } from "@/components/contacts/call-button";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 const ITEMS_PER_SECTION = 5;
 
@@ -36,6 +38,7 @@ interface Props {
 }
 
 export function ContactsView({ initialContacts }: Props) {
+  const isMobile = useIsMobile();
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
 
   const [search, setSearch] = useState("");
@@ -243,6 +246,7 @@ export function ContactsView({ initialContacts }: Props) {
               <ContactCard
                 key={contact.id}
                 contact={contact}
+                isMobile={isMobile}
                 onSelect={() => {
                   setSelectedContact(contact);
                   setDetailOpen(true);
@@ -293,6 +297,7 @@ export function ContactsView({ initialContacts }: Props) {
               <ContactListItem
                 key={contact.id}
                 contact={contact}
+                isMobile={isMobile}
                 onSelect={() => {
                   setSelectedContact(contact);
                   setDetailOpen(true);
@@ -350,11 +355,13 @@ export function ContactsView({ initialContacts }: Props) {
 
 function ContactCard({
   contact,
+  isMobile,
   onSelect,
   onUpdate,
   onFollowUp,
 }: {
   contact: Contact;
+  isMobile: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<Contact>) => void;
   onFollowUp: (contact: Contact) => void;
@@ -389,6 +396,9 @@ function ContactCard({
         </div>
 
         <div className="flex items-center gap-1">
+          {isMobile && contact.phone && (
+            <CallButton phone={contact.phone} contactName={contact.name} />
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -448,12 +458,14 @@ function ContactCard({
 
 function ContactListItem({
   contact,
+  isMobile,
   onSelect,
   onUpdate,
   onDelete,
   onFollowUp,
 }: {
   contact: Contact;
+  isMobile: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<Contact>) => void;
   onDelete: (id: string) => void;
@@ -490,6 +502,9 @@ function ContactListItem({
           <span className="hidden text-xs text-app-muted md:inline">
             {contact.email}
           </span>
+        )}
+        {isMobile && contact.phone && (
+          <CallButton phone={contact.phone} contactName={contact.name} />
         )}
         <button
           type="button"
