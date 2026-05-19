@@ -78,7 +78,7 @@ const WILL_CHANGE_IDLE_MS = 500
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function BottomNav() {
-  const navRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLDivElement>(null)
   const willChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isMobile = useIsMobile()
@@ -205,9 +205,7 @@ export function BottomNav() {
               }`}
             >
               <Icon
-                className="h-5 w-5"
-                strokeWidth={active ? 2.5 : 2}
-                fill={active ? "currentColor" : "none"}
+                className={`h-5 w-5 ${active ? "[stroke-width:2.5] fill-current" : "[stroke-width:2]"}`}
                 aria-hidden="true"
               />
               <span className={`leading-none ${active ? "font-medium" : ""}`}>

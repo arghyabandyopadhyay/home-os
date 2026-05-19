@@ -3,12 +3,13 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import type { Variants, Transition } from "framer-motion"
-import { Search } from "lucide-react"
+import { Search, Mic } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import { useLowPerformance } from "@/hooks/use-low-performance"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
+import { useVoiceInput } from "@/hooks/use-voice-input"
 import { DURATION, EASING } from "@/lib/motion"
 
 /**
@@ -120,6 +121,7 @@ export function FloatingSearchBar() {
   const prefersReducedMotion = useReducedMotion()
   const isLowPerf = useLowPerformance()
   const scrollDirection = useScrollDirection({ threshold: SCROLL_THRESHOLD })
+  const { isSupported: voiceSupported, isListening, transcript, startListening, stopListening, clearTranscript } = useVoiceInput()
   const [isExpanded, setIsExpanded] = useState(false)
   const [commandMenuOpen, setCommandMenuOpen] = useState(false)
   const [entranceComplete, setEntranceComplete] = useState(false)
@@ -241,6 +243,25 @@ export function FloatingSearchBar() {
     return () => window.removeEventListener("open-command-menu", handleOpen)
   }, [])
 
+  // When voice input produces a transcript, open command menu with it
+  useEffect(() => {
+    if (transcript && !isListening) {
+      // Dispatch a custom event with the transcript to pre-fill the command menu search
+      window.dispatchEvent(
+        new CustomEvent("open-command-menu", { detail: { query: transcript } })
+      )
+      clearTranscript()
+    }
+  }, [transcript, isListening, clearTranscript])
+
+  const handleMicPress = useCallback(() => {
+    if (isListening) {
+      stopListening()
+    } else {
+      startListening()
+    }
+  }, [isListening, startListening, stopListening])
+
   if (!isMobile) {
     return null
   }
@@ -265,6 +286,7 @@ export function FloatingSearchBar() {
       }}
     >
       <motion.div
+        className="flex items-center gap-2"
         animate={{ y: isScrollHidden ? HIDE_DISPLACEMENT : 0 }}
         transition={scrollTransition}
       >
@@ -287,6 +309,21 @@ export function FloatingSearchBar() {
           <Search className="size-[18px] text-app-muted" aria-hidden="true" />
           <span className="text-sm text-app-muted">Search</span>
         </motion.button>
+
+        {voiceSupported && (
+          <button
+            type="button"
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
+            onClick={handleMicPress}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg outline-offset-2 transition-colors focus-visible:outline-2 focus-visible:outline-current ${
+              isListening
+                ? "border-red-400/50 bg-red-500/10 text-red-400"
+                : "border-app bg-app-surface text-app-muted"
+            }`}
+          >
+            <Mic className={`size-4 ${isListening ? "animate-pulse" : ""}`} aria-hidden="true" />
+          </button>
+        )}
       </motion.div>
     </motion.div>
   )
