@@ -287,35 +287,16 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
           <h2 className="text-xl font-medium tracking-tight">
             Currently Reading
           </h2>
-          <div className="space-y-2">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {displayedReading.map((book) => (
-              <div key={book.id} className="item-app flex items-center gap-4">
-                <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-app-elevated">
-                  {book.cover_url ? (
-                    <Image
-                      src={book.cover_url}
-                      alt={book.title}
-                      fill
-                      sizes="48px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <BookOpen size={16} className="text-app-muted" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{book.title || "Untitled"}</p>
-                  <p className="truncate text-sm text-app-muted">
-                    {book.author || "Unknown author"}
-                  </p>
-                  <ProgressBar value={book.progress} />
-                </div>
-                <div className="shrink-0 text-sm text-app-muted">
-                  {book.progress}%
-                </div>
-              </div>
+              <BookCard
+                key={book.id}
+                book={book}
+                onUpdate={updateBook}
+                onDelete={deleteBook}
+                onAutofill={autofillBook}
+                onUpload={uploadBookFile}
+              />
             ))}
           </div>
           {readingBooks.length > ITEMS_PER_SECTION && (

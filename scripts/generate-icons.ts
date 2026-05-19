@@ -132,6 +132,57 @@ async function generateAppleTouchIcon(
   console.log(`  ✓ apple-touch-icon.png (${APPLE_TOUCH_ICON_SIZE}x${APPLE_TOUCH_ICON_SIZE})`);
 }
 
+async function generateFaviconIco(
+  sharp: Sharp
+): Promise<void> {
+  // Generate 32x32 PNG buffer for the ICO file
+  const png32 = await sharp(SOURCE_SVG).resize(32, 32).png().toBuffer();
+  const png16 = await sharp(SOURCE_SVG).resize(16, 16).png().toBuffer();
+
+  // Build a minimal ICO file containing both 16x16 and 32x32 PNG images
+  const icoBuffer = buildIco([png16, png32], [16, 32]);
+  const outputPath = resolve(ROOT_DIR, "public/favicon.ico");
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(outputPath, icoBuffer);
+  console.log("  ✓ favicon.ico (16x16 + 32x32)");
+}
+
+/**
+ * Builds a minimal ICO file from PNG buffers.
+ * ICO format: 6-byte header + 16-byte directory entries + PNG data.
+ */
+function buildIco(pngBuffers: Buffer[], sizes: number[]): Buffer {
+  const numImages = pngBuffers.length;
+  const headerSize = 6;
+  const dirEntrySize = 16;
+  const dirSize = dirEntrySize * numImages;
+  let dataOffset = headerSize + dirSize;
+
+  // ICO header: reserved(2) + type(2, 1=ICO) + count(2)
+  const header = Buffer.alloc(headerSize);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // type: ICO
+  header.writeUInt16LE(numImages, 4); // image count
+
+  const dirEntries: Buffer[] = [];
+  for (let i = 0; i < numImages; i++) {
+    const entry = Buffer.alloc(dirEntrySize);
+    const size = sizes[i] >= 256 ? 0 : sizes[i]; // 0 means 256
+    entry.writeUInt8(size, 0); // width
+    entry.writeUInt8(size, 1); // height
+    entry.writeUInt8(0, 2); // color palette
+    entry.writeUInt8(0, 3); // reserved
+    entry.writeUInt16LE(1, 4); // color planes
+    entry.writeUInt16LE(32, 6); // bits per pixel
+    entry.writeUInt32LE(pngBuffers[i].length, 8); // image size
+    entry.writeUInt32LE(dataOffset, 12); // offset to image data
+    dirEntries.push(entry);
+    dataOffset += pngBuffers[i].length;
+  }
+
+  return Buffer.concat([header, ...dirEntries, ...pngBuffers]);
+}
+
 async function main(): Promise<void> {
   console.log("Generating PWA icons from source SVG...\n");
 
@@ -154,6 +205,9 @@ async function main(): Promise<void> {
 
   console.log("\nApple touch icon:");
   await generateAppleTouchIcon(sharp);
+
+  console.log("\nFavicon:");
+  await generateFaviconIco(sharp);
 
   console.log("\n✓ All icons generated successfully.");
 }
