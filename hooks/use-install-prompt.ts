@@ -85,7 +85,12 @@ export function useInstallPrompt(): InstallPromptState {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isPrompting, setIsPrompting] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
-  const [platform] = useState<Platform>(() => detectPlatform())
+  const [platform, setPlatform] = useState<Platform>("unknown")
+
+  // Detect platform on mount (client-only to avoid hydration mismatch)
+  useEffect(() => {
+    setPlatform(detectPlatform())
+  }, [])
 
   // Detect standalone mode on mount and listen for changes
   useEffect(() => {

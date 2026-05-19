@@ -174,41 +174,53 @@ export function BottomNav() {
         : bottomNavShowTransition
 
   return (
-    <motion.nav
+    <div
       ref={navRef}
-      role="navigation"
-      aria-label="Main navigation"
-      aria-hidden={isScrollHidden}
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-app bg-app-surface/80 backdrop-blur-xl"
-      style={{
-        paddingBottom: "env(safe-area-inset-bottom)",
-        pointerEvents,
-      }}
-      animate={{ y: isScrollHidden ? "100%" : 0 }}
-      transition={scrollTransition}
+      className="fixed bottom-0 left-0 right-0 z-40 flex justify-center"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {visibleItems.map((item) => {
-        const Icon = item.icon
-        const active =
-          pathname === item.href ||
-          (item.href !== "/dashboard" && pathname.startsWith(item.href))
+      <motion.nav
+        role="navigation"
+        aria-label="Main navigation"
+        aria-hidden={isScrollHidden}
+        className="mx-4 mb-2 flex items-center justify-around rounded-2xl border border-app/50 bg-app-surface/70 px-2 py-1 shadow-lg shadow-black/10 backdrop-blur-2xl"
+        style={{ pointerEvents }}
+        animate={{ y: isScrollHidden ? "calc(100% + 20px)" : 0 }}
+        transition={scrollTransition}
+      >
+        {visibleItems.map((item) => {
+          const Icon = item.icon
+          const active =
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href))
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.ariaLabel}
-            aria-current={active ? "page" : undefined}
-            className={`flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 px-3 py-2 text-xs transition-colors ${
-              active ? "text-app" : "text-app-muted"
-            }`}
-          >
-            <Icon className="h-5 w-5" aria-hidden="true" />
-            <span className="leading-none">{item.label}</span>
-          </Link>
-        )
-      })}
-    </motion.nav>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={item.ariaLabel}
+              aria-current={active ? "page" : undefined}
+              className={`relative flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl px-4 py-2 text-xs transition-colors ${
+                active ? "text-app" : "text-app-muted"
+              }`}
+            >
+              <Icon
+                className="h-5 w-5"
+                strokeWidth={active ? 2.5 : 2}
+                fill={active ? "currentColor" : "none"}
+                aria-hidden="true"
+              />
+              <span className={`leading-none ${active ? "font-medium" : ""}`}>
+                {item.label}
+              </span>
+              {active && (
+                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-current" aria-hidden="true" />
+              )}
+            </Link>
+          )
+        })}
+      </motion.nav>
+    </div>
   )
 }
 
