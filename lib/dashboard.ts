@@ -63,7 +63,7 @@ export async function getTodayData(): Promise<TodayData | null> {
       .select("*")
       .eq("user_id", user.id)
       .eq("status", "reading")
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(3),
     supabase
       .from("contacts")
