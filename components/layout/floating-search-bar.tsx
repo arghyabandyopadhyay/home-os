@@ -128,7 +128,8 @@ export function FloatingSearchBar() {
   const hasDispatchedRef = useRef(false)
 
   // Derive scroll-hidden state
-  // Gate: disable scroll-hide while entrance is incomplete, command menu is open, or not mobile
+  // Hide on scroll down for fully immersive experience (YouTube-like).
+  // Reappears on scroll up along with header and bottom nav.
   const scrollHideEnabled = entranceComplete && !commandMenuOpen && isMobile
   const isScrollHidden = scrollHideEnabled && scrollDirection === "down" && !forceVisible
 
@@ -246,9 +247,9 @@ export function FloatingSearchBar() {
 
   return (
     <motion.div
-      className="fixed left-1/2 z-40 -translate-x-1/2"
+      className="fixed left-1/2 z-50 -translate-x-1/2"
       style={{
-        bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+        bottom: "calc(24px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height, 0px))",
         pointerEvents: isScrollHidden ? "none" : "auto",
       }}
       variants={entranceVariants}
