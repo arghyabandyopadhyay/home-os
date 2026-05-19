@@ -23,6 +23,7 @@ import {
   Settings,
   File,
   Search,
+  Mic,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Book } from "@/types/book";
@@ -31,6 +32,7 @@ import type { Contact } from "@/types/contact";
 import type { Document } from "@/types/document";
 import type { Note } from "@/types/note";
 import type { Task } from "@/types/task";
+import { useVoiceInput } from "@/hooks/use-voice-input";
 
 export function CommandMenu() {
   const [open, setOpen] = React.useState(false);
@@ -45,6 +47,14 @@ export function CommandMenu() {
   const [creating, setCreating] = React.useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const { isSupported: voiceSupported, isListening, transcript, startListening, stopListening } = useVoiceInput();
+
+  // When voice transcript updates while command menu is open, update search
+  React.useEffect(() => {
+    if (open && transcript) {
+      setSearch(transcript);
+    }
+  }, [open, transcript]);
 
   const resetSearchState = React.useCallback(() => {
     setSearch("");
@@ -80,7 +90,14 @@ export function CommandMenu() {
   }, []);
 
   React.useEffect(() => {
-    const handleOpenEvent = () => setOpen(true);
+    const handleOpenEvent = (e: Event) => {
+      setOpen(true);
+      // If the event carries a voice transcript query, pre-fill the search
+      const customEvent = e as CustomEvent<{ query?: string }>;
+      if (customEvent.detail?.query) {
+        setSearch(customEvent.detail.query);
+      }
+    };
     window.addEventListener("open-command-menu", handleOpenEvent);
     return () => window.removeEventListener("open-command-menu", handleOpenEvent);
   }, []);
@@ -237,11 +254,29 @@ export function CommandMenu() {
       onOpenChange={handleOpenChange}
       className="rounded-2xl border-white/10 bg-app-surface/90 shadow-2xl backdrop-blur-2xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:duration-200 data-closed:duration-200"
     >
-      <CommandInput
-        placeholder="Search or type a command…"
-        value={search}
-        onValueChange={setSearch}
-      />
+      <div className="relative flex items-center">
+        <div className="min-w-0 flex-1 [&_input]:pr-12">
+          <CommandInput
+            placeholder="Search or type a command…"
+            value={search}
+            onValueChange={setSearch}
+          />
+        </div>
+        {voiceSupported && (
+          <button
+            type="button"
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
+            onClick={isListening ? stopListening : startListening}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+              isListening
+                ? "bg-red-500/10 text-red-400"
+                : "text-app-muted hover:text-app"
+            }`}
+          >
+            <Mic className={`h-4 w-4 ${isListening ? "animate-pulse" : ""}`} aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       <CommandList>
         <CommandEmpty>

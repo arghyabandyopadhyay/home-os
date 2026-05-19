@@ -99,7 +99,7 @@ export const showTransition: Transition = {
  *
  * Validates: Requirements 1.2, 3.6
  */
-export const HIDE_DISPLACEMENT = 78
+export const HIDE_DISPLACEMENT = 150
 
 /**
  * Default scroll threshold in pixels.
@@ -184,15 +184,10 @@ export function FloatingSearchBar() {
     hasDispatchedRef.current = false
 
     // Tap during hide transition: cancel hide by forcing visible.
-    // Framer Motion will animate back from current position (Req 8.3, 3.5).
-    // Then proceed with activation below.
+    // Framer Motion will animate back from current position.
     if (scrollHideEnabled && scrollDirection === "down") {
       setForceVisible(true)
     }
-
-    // Tap during show transition: the bar is already animating to visible.
-    // Framer Motion will complete the show animation natively.
-    // We proceed with activation immediately (Req 8.2).
 
     if (prefersReducedMotion) {
       // Skip animation entirely and dispatch immediately
@@ -270,7 +265,7 @@ export function FloatingSearchBar() {
     <motion.div
       className="fixed left-1/2 z-50 -translate-x-1/2"
       style={{
-        bottom: "calc(36px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height, 0px))",
+        bottom: "calc(16px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height, 0px))",
         pointerEvents: isScrollHidden ? "none" : "auto",
       }}
       variants={entranceVariants}
