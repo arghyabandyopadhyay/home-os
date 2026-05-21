@@ -29,7 +29,7 @@ export default function AppLayout({
             <Header />
             <CommandMenu />
             <main
-              className="flex-1 bg-app overflow-y-auto pb-[var(--bottom-nav-height,0px)] md:pb-0"
+              className="flex-1 bg-app overflow-y-auto pt-10 pb-[var(--bottom-nav-height,0px)] md:pt-0 md:pb-0"
               style={{ WebkitOverflowScrolling: "touch" }}
             >
               {children}

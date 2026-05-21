@@ -137,16 +137,16 @@ export function Header() {
   return (
     <motion.header
       ref={headerRef}
-      className="fixed top-0 left-0 right-0 z-40 flex md:h-16 items-center gap-2 border-b border-app bg-app-surface/80 px-3 md:px-6 md:pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
+      className="fixed top-0 left-0 right-0 z-40 flex md:h-16 items-center gap-2 border-b border-app bg-app-surface/80 px-2 md:px-6 md:pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
       style={{ pointerEvents }}
       animate={{ y: isScrollHidden ? hideDisplacement : 0 }}
       transition={scrollTransition}
     >
-      {/* Mobile layout: hamburger + full-width search bar with mic + avatar */}
+      {/* Mobile layout: hamburger + full-width search bar + avatar */}
       <button
         onClick={openSidebar}
         aria-label="Open navigation menu"
-        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
       >
         <Menu size={20} aria-hidden="true" />
       </button>
@@ -163,7 +163,7 @@ export function Header() {
       </button>
 
       {/* Mobile user menu */}
-      <div className="shrink-0 md:hidden">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center md:hidden">
         <UserMenu />
       </div>
 

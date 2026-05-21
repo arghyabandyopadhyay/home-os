@@ -42,6 +42,9 @@ export default function LoginPage() {
       // Clean URL without reload
       window.history.replaceState({}, "", "/login");
     }
+    if (params.get("mode") === "signup") {
+      setIsSignup(true);
+    }
   }, []);
 
   async function handleAuth() {
