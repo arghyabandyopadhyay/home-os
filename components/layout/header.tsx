@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import type { Transition } from "framer-motion"
-import Link from "next/link"
 
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
@@ -12,8 +11,10 @@ import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { useImmersiveContext } from "@/components/layout/mobile-shell"
 import { DURATION, EASING } from "@/lib/motion"
 
+import { Menu, Search } from "lucide-react"
 import { UserMenu } from "./user-menu"
 import { SearchTrigger } from "./search-trigger"
+import { useMobileSidebar } from "@/hooks/use-mobile-sidebar"
 
 /**
  * The translateY displacement when hidden (px, negative = upward).
@@ -57,6 +58,7 @@ export function Header() {
   const headerRef = useRef<HTMLElement>(null)
   const willChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [hideDisplacement, setHideDisplacement] = useState(HEADER_HIDE_DISPLACEMENT)
+  const openSidebar = useMobileSidebar((s) => s.open)
 
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
@@ -135,20 +137,43 @@ export function Header() {
   return (
     <motion.header
       ref={headerRef}
-      className="fixed top-0 left-0 right-0 z-40 flex md:h-16 items-center justify-between border-b border-app bg-app-surface/80 px-6 pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
+      className="fixed top-0 left-0 right-0 z-40 flex md:h-16 items-center gap-2 border-b border-app bg-app-surface/80 px-3 md:px-6 md:pr-8 backdrop-blur-xl safe-area-header md:sticky md:left-auto md:right-auto"
       style={{ pointerEvents }}
       animate={{ y: isScrollHidden ? hideDisplacement : 0 }}
       transition={scrollTransition}
     >
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard" className="font-mono text-base font-semibold tracking-tight text-app md:hidden">
-          Home OS
-        </Link>
+      {/* Mobile layout: hamburger + full-width search bar with mic + avatar */}
+      <button
+        onClick={openSidebar}
+        aria-label="Open navigation menu"
+        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
+      >
+        <Menu size={20} aria-hidden="true" />
+      </button>
+
+      {/* Mobile inline search bar — fills remaining space */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("open-command-menu"))}
+        aria-label="Search"
+        className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-app bg-app-elevated/60 px-3 text-sm text-app-muted md:hidden"
+      >
+        <Search className="size-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">Search your home</span>
+      </button>
+
+      {/* Mobile user menu */}
+      <div className="shrink-0 md:hidden">
+        <UserMenu />
       </div>
 
-      <div className="flex items-center gap-3">
-        <SearchTrigger />
-        <UserMenu />
+      {/* Desktop layout: search trigger + user menu (right-aligned) */}
+      <div className="hidden md:flex md:flex-1 md:items-center md:justify-between">
+        <div />
+        <div className="flex items-center gap-3">
+          <SearchTrigger />
+          <UserMenu />
+        </div>
       </div>
     </motion.header>
   )

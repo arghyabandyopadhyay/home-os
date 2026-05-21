@@ -56,7 +56,7 @@ const items = [
   },
 ];
 
-export function Sidebar({ closeButton }: { closeButton?: React.ReactNode }) {
+export function Sidebar({ closeButton, onNavigate }: { closeButton?: React.ReactNode; onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -91,6 +91,7 @@ export function Sidebar({ closeButton }: { closeButton?: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               aria-current={active ? "page" : undefined}
               className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-colors ${
                 active

@@ -1,8 +1,9 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandMenu } from "@/components/layout/command-menu";
-import { FloatingSearchBar } from "@/components/layout/floating-search-bar";
 import { MobileShell } from "@/components/layout/mobile-shell";
+import { MobileSidebarWrapper } from "@/components/layout/mobile-sidebar-wrapper";
+import { VoiceAssistantFab } from "@/components/layout/voice-assistant-fab";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { AppProviders } from "@/components/layout/app-providers";
 import { Toaster } from "sonner";
@@ -27,7 +28,6 @@ export default function AppLayout({
           <MobileShell>
             <Header />
             <CommandMenu />
-            <FloatingSearchBar />
             <main
               className="flex-1 bg-app overflow-y-auto pb-[var(--bottom-nav-height,0px)] md:pb-0"
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -35,10 +35,12 @@ export default function AppLayout({
               {children}
             </main>
             <BottomNav />
+            <VoiceAssistantFab />
           </MobileShell>
         </div>
       </div>
       <Toaster richColors position="top-right" />
+      <MobileSidebarWrapper />
     </AppProviders>
   );
 }

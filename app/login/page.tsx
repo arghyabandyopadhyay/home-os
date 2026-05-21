@@ -24,6 +24,8 @@ export default function LoginPage() {
   const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
@@ -55,9 +57,23 @@ export default function LoginPage() {
       alert("Password must be at least 6 characters");
       return;
     }
+    if (isSignup && !fullName.trim()) {
+      alert("Please enter your name");
+      return;
+    }
+    if (isSignup && password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
     setLoading(true);
     if (isSignup) {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName.trim() },
+        },
+      });
       if (error) alert(error.message);
       else alert("Account created!");
     } else {
@@ -205,6 +221,16 @@ export default function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           className="input-app mb-4 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
         />
+        {isSignup && (
+          <input
+            type="text"
+            placeholder="Full name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            className="input-app mb-4 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        )}
         <input
           type="password"
           placeholder="Password"
@@ -212,6 +238,16 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           className="input-app mb-4 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
         />
+        {isSignup && (
+          <input
+            type="password"
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="input-app mb-4 w-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/30"
+          />
+        )}
 
         <div className="mb-4">
           <button
