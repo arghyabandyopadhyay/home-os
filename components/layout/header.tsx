@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import type { Transition } from "framer-motion"
+import { usePathname, useRouter } from "next/navigation"
 
 import { useIsMobile } from "@/hooks/use-is-mobile"
 import { useReducedMotion } from "@/hooks/use-reduced-motion"
@@ -11,7 +12,7 @@ import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { useImmersiveContext } from "@/components/layout/mobile-shell"
 import { DURATION, EASING } from "@/lib/motion"
 
-import { Menu, Search } from "lucide-react"
+import { ArrowLeft, Menu, Search } from "lucide-react"
 import { UserMenu } from "./user-menu"
 import { SearchTrigger } from "./search-trigger"
 import { useMobileSidebar } from "@/hooks/use-mobile-sidebar"
@@ -59,8 +60,13 @@ export function Header() {
   const willChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [hideDisplacement, setHideDisplacement] = useState(HEADER_HIDE_DISPLACEMENT)
   const openSidebar = useMobileSidebar((s) => s.open)
+  const pathname = usePathname()
+  const router = useRouter()
 
   const isMobile = useIsMobile()
+
+  // Show back button instead of hamburger on detail/reader pages
+  const isDetailPage = pathname.startsWith("/reader/") || pathname.startsWith("/notes/") || pathname.startsWith("/documents/")
   const prefersReducedMotion = useReducedMotion()
   const isLowPerf = useLowPerformance()
   const scrollDirection = useScrollDirection({ threshold: HEADER_SCROLL_THRESHOLD })
@@ -142,14 +148,24 @@ export function Header() {
       animate={{ y: isScrollHidden ? hideDisplacement : 0 }}
       transition={scrollTransition}
     >
-      {/* Mobile layout: hamburger + full-width search bar + avatar */}
-      <button
-        onClick={openSidebar}
-        aria-label="Open navigation menu"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
-      >
-        <Menu size={20} aria-hidden="true" />
-      </button>
+      {/* Mobile layout: hamburger/back + full-width search bar + avatar */}
+      {isDetailPage ? (
+        <button
+          onClick={() => router.back()}
+          aria-label="Go back"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
+        >
+          <ArrowLeft size={20} aria-hidden="true" />
+        </button>
+      ) : (
+        <button
+          onClick={openSidebar}
+          aria-label="Open navigation menu"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-app-muted hover:bg-app-elevated hover:text-app transition-colors md:hidden"
+        >
+          <Menu size={20} aria-hidden="true" />
+        </button>
+      )}
 
       {/* Mobile inline search bar — fills remaining space */}
       <button

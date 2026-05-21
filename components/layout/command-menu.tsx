@@ -463,8 +463,8 @@ export function CommandMenu() {
                     <CalendarDays className="mr-2 h-4 w-4" />
                     <div className="flex flex-col">
                       <span>{event.title}</span>
-                      <span className="text-xs text-app-muted">
-                        {new Date(event.starts_at).toLocaleDateString()}
+                      <span className="text-xs text-app-muted" suppressHydrationWarning>
+                        {new Date(event.starts_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                       </span>
                     </div>
                   </CommandItem>

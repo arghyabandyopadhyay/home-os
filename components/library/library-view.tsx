@@ -9,6 +9,7 @@ import { Book } from "@/types/book";
 import { toast } from "sonner";
 import { v4 as uuid } from "uuid";
 import TextareaAutosize from "react-textarea-autosize";
+import { uploadWithProgress } from "@/lib/upload-with-progress";
 
 import { RatingStars } from "./rating-stars";
 import { ProgressBar } from "./progress-bar";
@@ -28,6 +29,8 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   const [showAllReading, setShowAllReading] = useState(false);
   const [showAllToRead, setShowAllToRead] = useState(false);
   const [showAllFinished, setShowAllFinished] = useState(false);
+  const [uploadingBookId, setUploadingBookId] = useState<string | null>(null);
+  const [bookUploadProgress, setBookUploadProgress] = useState(0);
 
   async function createBook() {
     const {
@@ -201,28 +204,48 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
       return;
     }
 
+    setUploadingBookId(bookId);
+    setBookUploadProgress(0);
+
     const extension = file.name.split(".").pop();
     const path = `${user.id}/${bookId}.${extension}`;
 
-    const { error } = await supabase.storage.from("books").upload(path, file, {
-      upsert: true,
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        throw new Error("No auth session");
+      }
 
-    if (error) {
-      console.error(error);
-      toast.error(error.message);
-      return;
+      const { error } = await uploadWithProgress({
+        bucket: "books",
+        path,
+        file,
+        upsert: true,
+        onProgress: (percent) => setBookUploadProgress(percent),
+        token,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      await supabase
+        .from("books")
+        .update({
+          file_path: path,
+          file_type: extension,
+        })
+        .eq("id", bookId);
+
+      toast.success("Book uploaded");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload failed";
+      toast.error(message);
+    } finally {
+      setUploadingBookId(null);
+      setBookUploadProgress(0);
     }
-
-    await supabase
-      .from("books")
-      .update({
-        file_path: path,
-        file_type: extension,
-      })
-      .eq("id", bookId);
-
-    toast.success("Book uploaded");
   }
 
   // Filter books by search
@@ -296,6 +319,8 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
                 onUpload={uploadBookFile}
+                isUploading={uploadingBookId === book.id}
+                uploadProgress={bookUploadProgress}
               />
             ))}
           </div>
@@ -325,6 +350,8 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
                 onUpload={uploadBookFile}
+                isUploading={uploadingBookId === book.id}
+                uploadProgress={bookUploadProgress}
               />
             ))}
           </div>
@@ -354,6 +381,8 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
                 onUpload={uploadBookFile}
+                isUploading={uploadingBookId === book.id}
+                uploadProgress={bookUploadProgress}
               />
             ))}
           </div>
@@ -379,12 +408,16 @@ function BookCard({
   onDelete,
   onAutofill,
   onUpload,
+  isUploading,
+  uploadProgress,
 }: {
   book: Book;
   onUpdate: (id: string, updates: Partial<Book>) => void;
   onDelete: (id: string) => void;
   onAutofill: (id: string, title: string) => void;
   onUpload: (id: string, file?: File) => void;
+  isUploading: boolean;
+  uploadProgress: number;
 }) {
   return (
     <div className="card-app p-4">
@@ -498,7 +531,20 @@ function BookCard({
         type="file"
         accept=".epub,.pdf,application/epub+zip,application/pdf"
         onChange={(e) => onUpload(book.id, e.target.files?.[0])}
+        disabled={isUploading}
       />
+
+      {isUploading && (
+        <div className="mt-2 space-y-1">
+          <p className="text-xs text-app-muted">Uploading... {uploadProgress}%</p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-app-elevated">
+            <div
+              className="h-full rounded-full bg-blue-500 transition-all"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {book.file_path && (
         <Link

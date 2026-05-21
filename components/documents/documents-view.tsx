@@ -12,6 +12,7 @@ import {
   filterDocumentsByQuery,
   filterDocumentsByTag,
 } from "@/lib/documents-utils"
+import { uploadWithProgress } from "@/lib/upload-with-progress"
 
 type ViewMode = "grid" | "list"
 
@@ -79,19 +80,25 @@ export function DocumentsView({
     const filePath = `${user.id}/${documentId}.pdf`
 
     try {
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, file, {
-          upsert: false,
-          contentType: "application/pdf",
-        })
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("No auth session")
+      }
+
+      const { error: uploadError } = await uploadWithProgress({
+        bucket: "documents",
+        path: filePath,
+        file,
+        contentType: "application/pdf",
+        upsert: false,
+        onProgress: (percent) => setUploadProgress(percent),
+        token,
+      })
 
       if (uploadError) {
         throw uploadError
       }
-
-      // Simulate progress since Supabase JS client doesn't support onUploadProgress natively
-      setUploadProgress(100)
 
       // Insert DB row
       const { data, error: dbError } = await supabase
@@ -467,11 +474,11 @@ function DocumentCard({
               {doc.title}
             </button>
           )}
-          <p className="text-xs text-app-muted">
+          <p className="text-xs text-app-muted" suppressHydrationWarning>
             {doc.file_size
               ? `${(doc.file_size / 1024 / 1024).toFixed(1)} MB`
               : ""}{" "}
-            · {new Date(doc.created_at).toLocaleDateString()}
+            · {new Date(doc.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
           </p>
         </div>
       </div>
@@ -546,8 +553,8 @@ function DocumentListItem({
           {doc.title}
         </Link>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-app-muted">
-            {new Date(doc.created_at).toLocaleDateString()}
+          <span className="text-xs text-app-muted" suppressHydrationWarning>
+            {new Date(doc.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
           </span>
           {(doc.tags ?? []).length > 0 && (
             <span className="text-xs text-app-muted">
