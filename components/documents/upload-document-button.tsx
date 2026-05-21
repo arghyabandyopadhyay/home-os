@@ -1,16 +1,19 @@
 "use client"
 
 import { useRef } from "react"
-import { FileText } from "lucide-react"
+import { Upload } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { v4 as uuid } from "uuid"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 import { validateUploadFile } from "@/lib/documents-utils"
 import { uploadWithProgress } from "@/lib/upload-with-progress"
-import { EmptyState } from "@/components/shared/empty-state"
+import { useRouter } from "next/navigation"
 
-export function DocumentsEmptyState() {
+/**
+ * Client component button that handles document upload with progress.
+ * Used in the page header and empty state.
+ */
+export function UploadDocumentButton({ variant = "primary" }: { variant?: "primary" | "inline" }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -18,6 +21,7 @@ export function DocumentsEmptyState() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Reset input so the same file can be re-selected
     e.target.value = ""
 
     const validation = validateUploadFile(file)
@@ -94,14 +98,19 @@ export function DocumentsEmptyState() {
         className="hidden"
         aria-label="Select PDF file to upload"
       />
-      <EmptyState
-        module="documents"
-        icon={FileText}
-        heading="Your documents live here"
-        body="Upload a PDF to start building your private document library."
-        actionLabel="Upload a document"
-        onAction={() => fileInputRef.current?.click()}
-      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className={
+          variant === "primary"
+            ? "btn-primary-app inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-sm"
+            : "btn-primary-app inline-flex cursor-pointer items-center gap-2 px-4 py-2 text-sm"
+        }
+        aria-label="Upload document"
+      >
+        <Upload className="h-4 w-4" aria-hidden="true" />
+        Upload
+      </button>
     </>
   )
 }
