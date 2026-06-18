@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 import { EpubReader } from "@/components/library/epub-reader";
-import { PdfReader } from "@/components/library/pdf-reader";
+import { DocumentReader } from "@/components/shared/document-reader";
 
 export default async function ReaderPage({
   params,
@@ -31,7 +31,7 @@ export default async function ReaderPage({
   return (
     <div className="h-screen bg-app text-app">
       {isPdf ? (
-        <PdfReader url={signedUrlData?.signedUrl || ""} />
+        <DocumentReader url={signedUrlData?.signedUrl || ""} title={book.title} />
       ) : (
         <EpubReader url={signedUrlData?.signedUrl || ""} />
       )}
