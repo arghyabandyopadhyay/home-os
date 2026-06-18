@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { DocumentReader } from "@/components/documents/document-reader"
+import { DocumentReader } from "@/components/shared/document-reader"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { PageShell } from "@/components/layout/page-shell"
