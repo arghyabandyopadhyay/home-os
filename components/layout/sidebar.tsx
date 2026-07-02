@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
+  Search,
   NotebookPen,
   CheckSquare,
   Library,
@@ -12,12 +13,18 @@ import {
   CalendarDays,
   FileText,
 } from "lucide-react";
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 
 const items = [
   {
     title: "Today",
     href: "/dashboard",
     icon: Home,
+  },
+  {
+    title: "Search",
+    href: "/search",
+    icon: Search,
   },
   {
     title: "Notes",
@@ -78,6 +85,10 @@ export function Sidebar({ closeButton, onNavigate }: { closeButton?: React.React
           </p>
         </div>
         {closeButton}
+      </div>
+
+      <div className="px-4 pb-2">
+        <WorkspaceSwitcher />
       </div>
 
       <nav className="flex-1 space-y-2 px-4" aria-label="Main navigation">

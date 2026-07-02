@@ -11,7 +11,6 @@ import {
   CommandGroup,
   CommandSeparator,
 } from "@/components/ui/command";
-import { createClient } from "@/lib/supabase/client";
 import {
   BookOpen,
   Users,
@@ -26,28 +25,80 @@ import {
   Mic,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Book } from "@/types/book";
-import type { CalendarEvent } from "@/types/calendar";
-import type { Contact } from "@/types/contact";
-import type { Document } from "@/types/document";
-import type { Note } from "@/types/note";
-import type { Task } from "@/types/task";
 import { useVoiceInput } from "@/hooks/use-voice-input";
+import { useCreateNote } from "@/hooks/queries/use-notes";
+import { useCreateTask } from "@/hooks/queries/use-tasks";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import { useSearch } from "@/hooks/queries/use-search";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useSearchStore } from "@/hooks/use-search-store";
+import type { SearchCategory, SearchResultItem } from "@/types/search";
+import type { ApiClientError } from "@/lib/api-client";
+
+const CATEGORY_ICON: Record<SearchCategory, React.ElementType> = {
+  tasks: CheckSquare,
+  notes: FileText,
+  books: BookOpen,
+  contacts: Users,
+  documents: File,
+};
+
+const CATEGORY_LABEL: Record<SearchCategory, string> = {
+  tasks: "Tasks",
+  notes: "Notes",
+  books: "Books",
+  contacts: "Contacts",
+  documents: "Documents",
+};
+
+function getResultRoute(result: SearchResultItem): string {
+  switch (result.category) {
+    case "notes":
+      return `/notes/${result.id}`;
+    case "tasks":
+      return "/tasks";
+    case "documents":
+      return `/documents/${result.id}`;
+    case "contacts":
+      return "/contacts";
+    case "books":
+      return result.metadata?.file_path ? `/reader/${result.id}` : "/library";
+    default:
+      return "/dashboard";
+  }
+}
 
 export function CommandMenu() {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
-  const [books, setBooks] = React.useState<Book[]>([]);
-  const [contacts, setContacts] = React.useState<Contact[]>([]);
-  const [documents, setDocuments] = React.useState<Document[]>([]);
-  const [events, setEvents] = React.useState<CalendarEvent[]>([]);
-  const [notes, setNotes] = React.useState<Note[]>([]);
-  const [tasks, setTasks] = React.useState<Task[]>([]);
-  const [loading, setLoading] = React.useState(false);
   const [creating, setCreating] = React.useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const createNoteMutation = useCreateNote();
+  const createTaskMutation = useCreateTask();
+  const handleError = useApiErrorHandler();
+  const searchStore = useSearchStore();
   const { isSupported: voiceSupported, isListening, transcript, startListening, stopListening } = useVoiceInput();
+
+  const debouncedSearch = useDebouncedValue(search, 300);
+
+  const { data, isLoading } = useSearch({
+    query: open ? debouncedSearch : "",
+    pageSize: 5,
+  });
+
+  // Group results by category
+  const resultsByCategory = React.useMemo(() => {
+    if (!data?.results) return new Map<SearchCategory, SearchResultItem[]>();
+    const grouped = new Map<SearchCategory, SearchResultItem[]>();
+    for (const result of data.results) {
+      const existing = grouped.get(result.category) || [];
+      existing.push(result);
+      grouped.set(result.category, existing);
+    }
+    return grouped;
+  }, [data?.results]);
+
+  const hasSearchResults = resultsByCategory.size > 0;
 
   // When voice transcript updates while command menu is open, update search
   React.useEffect(() => {
@@ -58,12 +109,6 @@ export function CommandMenu() {
 
   const resetSearchState = React.useCallback(() => {
     setSearch("");
-    setBooks([]);
-    setContacts([]);
-    setDocuments([]);
-    setEvents([]);
-    setNotes([]);
-    setTasks([]);
   }, []);
 
   const handleOpenChange = React.useCallback(
@@ -102,150 +147,51 @@ export function CommandMenu() {
     return () => window.removeEventListener("open-command-menu", handleOpenEvent);
   }, []);
 
-  React.useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) return;
-
-        const q = search.trim();
-        if (!q) {
-          setBooks([]);
-          setContacts([]);
-          setDocuments([]);
-          setEvents([]);
-          setNotes([]);
-          setTasks([]);
-          return;
-        }
-
-        const pattern = `%${q}%`;
-
-        const [booksRes, contactsRes, documentsRes, eventsRes, notesRes, tasksRes] = await Promise.all([
-          supabase
-            .from("books")
-            .select("*")
-            .eq("user_id", user.id)
-            .or(`title.ilike.${pattern},author.ilike.${pattern}`)
-            .limit(5),
-          supabase
-            .from("contacts")
-            .select("*")
-            .eq("user_id", user.id)
-            .or(
-              `name.ilike.${pattern},email.ilike.${pattern},company.ilike.${pattern}`,
-            )
-            .limit(5),
-          supabase
-            .from("documents")
-            .select("*")
-            .eq("user_id", user.id)
-            .ilike("title", pattern)
-            .limit(5),
-          supabase
-            .from("calendar_events")
-            .select("*")
-            .eq("user_id", user.id)
-            .ilike("title", pattern)
-            .limit(5),
-          supabase
-            .from("notes")
-            .select("*")
-            .eq("user_id", user.id)
-            .or(`title.ilike.${pattern},content.ilike.${pattern}`)
-            .limit(5),
-          supabase
-            .from("tasks")
-            .select("*")
-            .eq("user_id", user.id)
-            .ilike("title", pattern)
-            .limit(5),
-        ]);
-
-        setBooks(booksRes.data || []);
-        setContacts(contactsRes.data || []);
-        setDocuments(documentsRes.data || []);
-        setEvents(eventsRes.data || []);
-        setNotes(notesRes.data || []);
-        setTasks(tasksRes.data || []);
-      } catch (error) {
-        console.error("Search error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timer = setTimeout(fetchData, 300);
-    return () => clearTimeout(timer);
-  }, [search, open, supabase]);
-
   const handleSelect = (path: string) => {
     router.push(path);
     handleOpenChange(false);
   };
 
-  async function createNote() {
+  function createNote() {
     setCreating(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from("notes")
-        .insert({ user_id: user.id, title: "Untitled", content: "" })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      handleSelect(`/notes/${data.id}`);
-    } catch {
-      toast.error("Could not create note");
-    } finally {
-      setCreating(false);
-    }
+    createNoteMutation.mutate(
+      { title: "Untitled", content: "" },
+      {
+        onSuccess: (data) => {
+          handleSelect(`/notes/${data.id}`);
+          setCreating(false);
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setCreating(false);
+        },
+      },
+    );
   }
 
-  async function createTask() {
+  function createTask() {
     setCreating(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from("tasks")
-        .insert({ user_id: user.id, title: "New task", completed: false })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      handleSelect("/tasks");
-      toast.success("Task created");
-    } catch {
-      toast.error("Could not create task");
-    } finally {
-      setCreating(false);
-    }
+    createTaskMutation.mutate(
+      { title: "New task" },
+      {
+        onSuccess: () => {
+          handleSelect("/tasks");
+          toast.success("Task created");
+          setCreating(false);
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setCreating(false);
+        },
+      },
+    );
   }
 
-  const hasSearchResults =
-    books.length > 0 ||
-    contacts.length > 0 ||
-    documents.length > 0 ||
-    events.length > 0 ||
-    notes.length > 0 ||
-    tasks.length > 0;
+  function handleSeeAllResults() {
+    searchStore.setQuery(search);
+    router.push(`/search?q=${encodeURIComponent(search)}`);
+    handleOpenChange(false);
+  }
 
   return (
     <CommandDialog
@@ -280,7 +226,7 @@ export function CommandMenu() {
 
       <CommandList>
         <CommandEmpty>
-          {loading ? (
+          {isLoading && search ? (
             "Searching…"
           ) : search ? (
             <div className="flex flex-col items-center gap-2 py-4">
@@ -378,121 +324,48 @@ export function CommandMenu() {
 
         {search && hasSearchResults && (
           <>
-            {tasks.length > 0 && (
-              <CommandGroup heading="Tasks">
-                {tasks.map((task) => (
-                  <CommandItem
-                    key={task.id}
-                    onSelect={() => handleSelect("/tasks")}
-                    className="cursor-pointer"
-                  >
-                    <CheckSquare className="mr-2 h-4 w-4" />
-                    {task.title}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+            {(["tasks", "notes", "books", "contacts", "documents"] as SearchCategory[]).map(
+              (category) => {
+                const items = resultsByCategory.get(category);
+                if (!items || items.length === 0) return null;
+                const Icon = CATEGORY_ICON[category];
+                return (
+                  <CommandGroup key={category} heading={CATEGORY_LABEL[category]}>
+                    {items.map((result) => (
+                      <CommandItem
+                        key={result.id}
+                        onSelect={() => handleSelect(getResultRoute(result))}
+                        className="cursor-pointer"
+                      >
+                        <Icon className="mr-2 h-4 w-4" />
+                        <div className="flex flex-col">
+                          <span>{result.title}</span>
+                          {result.snippet && (
+                            <span className="text-xs text-app-muted">
+                              {result.snippet.length > 80
+                                ? result.snippet.slice(0, 80).replace(/\s+\S*$/, "") + "…"
+                                : result.snippet}
+                            </span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                );
+              },
             )}
 
-            {notes.length > 0 && (
-              <CommandGroup heading="Notes">
-                {notes.map((note) => (
-                  <CommandItem
-                    key={note.id}
-                    onSelect={() => handleSelect(`/notes/${note.id}`)}
-                    className="cursor-pointer"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    {note.title}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+            <CommandSeparator />
 
-            {books.length > 0 && (
-              <CommandGroup heading="Books">
-                {books.map((book) => (
-                  <CommandItem
-                    key={book.id}
-                    onSelect={() =>
-                      handleSelect(
-                        book.file_path ? `/reader/${book.id}` : "/library",
-                      )
-                    }
-                    className="cursor-pointer"
-                  >
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>{book.title}</span>
-                      <span className="text-xs text-app-muted">
-                        {book.author}
-                      </span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {contacts.length > 0 && (
-              <CommandGroup heading="Contacts">
-                {contacts.map((contact) => (
-                  <CommandItem
-                    key={contact.id}
-                    onSelect={() => handleSelect("/contacts")}
-                    className="cursor-pointer"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>{contact.name}</span>
-                      <span className="text-xs text-app-muted">
-                        {contact.email || contact.company}
-                      </span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {events.length > 0 && (
-              <CommandGroup heading="Events">
-                {events.map((event) => (
-                  <CommandItem
-                    key={event.id}
-                    onSelect={() => handleSelect("/calendar")}
-                    className="cursor-pointer"
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>{event.title}</span>
-                      <span className="text-xs text-app-muted" suppressHydrationWarning>
-                        {new Date(event.starts_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                      </span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            {documents.length > 0 && (
-              <CommandGroup heading="Documents">
-                {documents.map((doc) => (
-                  <CommandItem
-                    key={doc.id}
-                    onSelect={() => handleSelect(`/documents/${doc.id}`)}
-                    className="cursor-pointer"
-                  >
-                    <File className="mr-2 h-4 w-4" />
-                    <div className="flex flex-col">
-                      <span>{doc.title}</span>
-                      {(doc.tags ?? []).length > 0 && (
-                        <span className="text-xs text-app-muted">
-                          {(doc.tags ?? []).join(", ")}
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+            <CommandGroup>
+              <CommandItem
+                onSelect={handleSeeAllResults}
+                className="cursor-pointer"
+              >
+                <Search className="mr-2 h-4 w-4" />
+                See all results for &ldquo;{search}&rdquo;
+              </CommandItem>
+            </CommandGroup>
           </>
         )}
       </CommandList>

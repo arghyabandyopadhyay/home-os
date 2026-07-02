@@ -10,6 +10,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname(),
 }))
 
+// Mock workspace switcher to avoid Supabase client initialization
+vi.mock("@/components/workspace/workspace-switcher", () => ({
+  WorkspaceSwitcher: ({ compact }: { compact?: boolean }) => (
+    <div data-testid="workspace-switcher" data-compact={compact} />
+  ),
+}))
+
 describe("Sidebar", () => {
   beforeEach(() => {
     mockPathname.mockReturnValue("/dashboard")
@@ -163,12 +170,12 @@ describe("Sidebar", () => {
 
       // Tab to the second nav link
       await user.tab()
-      const secondLink = screen.getByRole("link", { name: /Notes/i })
+      const secondLink = screen.getByRole("link", { name: /Search/i })
       expect(document.activeElement).toBe(secondLink)
 
       // Tab to the third nav link
       await user.tab()
-      const thirdLink = screen.getByRole("link", { name: /Tasks/i })
+      const thirdLink = screen.getByRole("link", { name: /Notes/i })
       expect(document.activeElement).toBe(thirdLink)
     })
 

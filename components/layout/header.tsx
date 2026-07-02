@@ -16,6 +16,9 @@ import { ArrowLeft, Menu, Search } from "lucide-react"
 import { UserMenu } from "./user-menu"
 import { SearchTrigger } from "./search-trigger"
 import { useMobileSidebar } from "@/hooks/use-mobile-sidebar"
+import { NotificationBell } from "@/components/notifications/notification-bell"
+import { NotificationCenter } from "@/components/notifications/notification-center"
+import { useNotificationStore } from "@/hooks/use-notification-store"
 
 /**
  * The translateY displacement when hidden (px, negative = upward).
@@ -64,6 +67,11 @@ export function Header() {
   const router = useRouter()
 
   const isMobile = useIsMobile()
+
+  // Notification state from Zustand store
+  const isPanelOpen = useNotificationStore((s) => s.isPanelOpen)
+  const setPanelOpen = useNotificationStore((s) => s.setPanelOpen)
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
 
   // Show back button instead of hamburger on detail/reader pages
   const isDetailPage = pathname.startsWith("/reader/") || pathname.startsWith("/notes/") || pathname.startsWith("/documents/")
@@ -179,7 +187,12 @@ export function Header() {
       </button>
 
       {/* Mobile user menu */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center md:hidden">
+      <div className="flex shrink-0 items-center gap-1 md:hidden">
+        <NotificationBell
+          unreadCount={unreadCount}
+          isOpen={isPanelOpen}
+          onToggle={() => setPanelOpen(!isPanelOpen)}
+        />
         <UserMenu />
       </div>
 
@@ -188,9 +201,20 @@ export function Header() {
         <div />
         <div className="flex items-center gap-3">
           <SearchTrigger />
+          <NotificationBell
+            unreadCount={unreadCount}
+            isOpen={isPanelOpen}
+            onToggle={() => setPanelOpen(!isPanelOpen)}
+          />
           <UserMenu />
         </div>
       </div>
+
+      {/* Notification Center panel */}
+      <NotificationCenter
+        isOpen={isPanelOpen}
+        onClose={() => setPanelOpen(false)}
+      />
     </motion.header>
   )
 }

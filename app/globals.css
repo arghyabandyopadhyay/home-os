@@ -126,6 +126,10 @@
   --home-text: #18181b;
   --home-muted: #6d6d76;
   --home-accent-glow: rgba(59, 130, 246, 0.08);
+  --home-diff-add: rgba(34, 197, 94, 0.15);
+  --home-diff-delete: rgba(239, 68, 68, 0.15);
+  --home-diff-add-text: rgb(22, 163, 74);
+  --home-diff-delete-text: rgb(220, 38, 38);
 }
 
 .dark {
@@ -136,6 +140,10 @@
   --home-text: #fafafa;
   --home-muted: #a1a1aa;
   --home-accent-glow: rgba(59, 130, 246, 0.1);
+  --home-diff-add: rgba(34, 197, 94, 0.2);
+  --home-diff-delete: rgba(239, 68, 68, 0.2);
+  --home-diff-add-text: rgb(74, 222, 128);
+  --home-diff-delete-text: rgb(252, 165, 165);
 }
 
 /* Motion constraint tokens */
@@ -390,6 +398,19 @@
 
   .item-app:hover {
     background-color: color-mix(in srgb, var(--home-elevated) 65%, transparent);
+  }
+}
+
+/* Pipeline visualizer: pulsing ring animation for active stage */
+@keyframes pulse-ring {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.3);
   }
 }
 
