@@ -1,7 +1,8 @@
 import { getNote, getNotes } from "@/lib/notes";
-import { NoteEditor } from "@/components/notes/note-editor";
+import { CollaborativeNoteEditor } from "@/components/notes/collaborative-note-editor";
 import { NotesSidebar } from "@/components/notes/notes-sidebar";
 import { PageShell } from "@/components/layout/page-shell";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -13,6 +14,17 @@ export default async function NotePage({
   const { id } = await params;
 
   const [note, notes] = await Promise.all([getNote(id), getNotes()]);
+
+  // Fetch current user profile for collaboration identity
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const userId = user?.id ?? "";
+  const displayName =
+    user?.user_metadata?.full_name || user?.email || "Anonymous";
+  const avatarUrl = user?.user_metadata?.avatar_url || null;
 
   if (!note) {
     return (
@@ -58,7 +70,12 @@ export default async function NotePage({
 
         <div className="min-w-0 flex-1 lg:w-[70%]">
           <div className="card-app overflow-hidden p-0">
-            <NoteEditor note={note} />
+            <CollaborativeNoteEditor
+              note={note}
+              userId={userId}
+              displayName={displayName}
+              avatarUrl={avatarUrl}
+            />
           </div>
         </div>
       </div>
