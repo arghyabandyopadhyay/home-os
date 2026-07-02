@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { CalendarEvent } from "@/types/calendar";
+import { createClientApiClient } from "@/lib/api-client";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 type EventEditFormProps = {
   event: CalendarEvent;
@@ -30,8 +34,7 @@ export function EventEditForm({ event, onSave, onCancel }: EventEditFormProps) {
   const [description, setDescription] = useState(event.description || "");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{ title?: string; startsAt?: string }>({});
-
-  const supabase = createClient();
+  const handleError = useApiErrorHandler();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,32 +52,24 @@ export function EventEditForm({ event, onSave, onCancel }: EventEditFormProps) {
     setSaving(true);
 
     try {
-      const updatePayload: Record<string, unknown> = {
+      const body: Record<string, unknown> = {
         title: title.trim(),
         starts_at: new Date(startsAt).toISOString(),
         description: description.trim() || null,
-        updated_at: new Date().toISOString(),
       };
 
       if (endsAt) {
-        updatePayload.ends_at = new Date(endsAt).toISOString();
+        body.ends_at = new Date(endsAt).toISOString();
       } else {
-        updatePayload.ends_at = null;
+        body.ends_at = null;
       }
 
-      const { data, error } = await supabase
-        .from("calendar_events")
-        .update(updatePayload)
-        .eq("id", event.id)
-        .select()
-        .single();
+      const data = await api.patch<CalendarEvent>(`/calendar/events/${event.id}`, { body });
 
-      if (error) throw error;
-
-      onSave(data as CalendarEvent);
+      onSave(data);
       toast.success("Event updated");
-    } catch {
-      toast.error("Could not update event");
+    } catch (error) {
+      handleError(error as ApiClientError);
     } finally {
       setSaving(false);
     }

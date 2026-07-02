@@ -1,9 +1,15 @@
 "use client"
 
-import { useState, useRef, useCallback, useMemo } from "react"
-import { Upload, FileText, X, RotateCcw, Tag, Grid, List } from "lucide-react"
+import { useState, useRef, useCallback, useMemo, useEffect } from "react"
+import { Upload, X, RotateCcw, Tag, Grid, List } from "lucide-react"
+import { ProcessingIndicator } from "@/components/documents/processing-indicator"
+import { DocumentThumbnail } from "@/components/documents/document-thumbnail"
+import { BulkUploadQueue } from "@/components/documents/bulk-upload-queue"
+import { DocumentSearchResultCard } from "@/components/documents/document-search-result-card"
+import { useDocumentStatusPoller } from "@/hooks/use-document-status-poller"
+import { useDocumentSearch } from "@/hooks/queries/use-document-search"
+
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { Document } from "@/types/document"
 import { toast } from "sonner"
 import { v4 as uuid } from "uuid"
@@ -13,6 +19,17 @@ import {
   filterDocumentsByTag,
 } from "@/lib/documents-utils"
 import { uploadWithProgress } from "@/lib/upload-with-progress"
+import { createClient } from "@/lib/supabase/client"
+import { createClientApiClient } from "@/lib/api-client"
+import { useUpdateDocument, useDeleteDocument, useRetryDocumentProcessing, documentKeys } from "@/hooks/queries/use-documents"
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler"
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions"
+import { useBulkUploadStore } from "@/hooks/use-bulk-upload-store"
+import { useWorkspaceStore } from "@/hooks/use-workspace-store"
+import { useQueryClient } from "@tanstack/react-query"
+import type { ApiClientError } from "@/lib/api-client"
+
+const api = createClientApiClient()
 
 type ViewMode = "grid" | "list"
 
@@ -21,8 +38,8 @@ export function DocumentsView({
 }: {
   documents: Document[]
 }) {
-  const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const [documents, setDocuments] = useState(initialDocuments)
   const [search, setSearch] = useState("")
@@ -32,6 +49,47 @@ export function DocumentsView({
   const [uploadProgress, setUploadProgress] = useState(0)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  const updateDocMutation = useUpdateDocument()
+  const deleteDocMutation = useDeleteDocument()
+  const handleError = useApiErrorHandler()
+  const { isReadOnly } = useWorkspacePermissions()
+  const queryClient = useQueryClient()
+  const { activeWorkspaceId } = useWorkspaceStore()
+  const { items: bulkItems, addFiles, updateItem } = useBulkUploadStore()
+  const bulkProcessingRef = useRef(false)
+
+  // Debounce search input by 300ms before passing to API search hook
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // API-powered content search
+  const { data: searchResults, isLoading: isSearching } = useDocumentSearch(debouncedSearch)
+
+  // Status polling for documents in pending/processing state
+  const { isPollPaused } = useDocumentStatusPoller(documents)
+
+  // Track previous statuses to detect transitions to "ready"
+  const prevStatusesRef = useRef<Record<string, string>>({})
+
+  useEffect(() => {
+    const prevStatuses = prevStatusesRef.current
+    for (const doc of documents) {
+      const prev = prevStatuses[doc.id]
+      if (prev && prev !== "ready" && doc.processing.status === "ready") {
+        const title = doc.title.length > 40 ? doc.title.slice(0, 37) + "..." : doc.title
+        toast.success(`Document "${title}" is ready`)
+      }
+    }
+    prevStatusesRef.current = Object.fromEntries(
+      documents.map((d) => [d.id, d.processing.status])
+    )
+  }, [documents])
 
   // Collect all unique tags from documents
   const allTags = useMemo(() => {
@@ -63,6 +121,8 @@ export function DocumentsView({
       return
     }
 
+    // File upload still uses Supabase Storage directly for the binary upload
+    const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -75,6 +135,9 @@ export function DocumentsView({
     setUploading(true)
     setUploadProgress(0)
     setPendingFile(file)
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     const documentId = uuid()
     const filePath = `${user.id}/${documentId}.pdf`
@@ -94,40 +157,46 @@ export function DocumentsView({
         upsert: false,
         onProgress: (percent) => setUploadProgress(percent),
         token,
+        signal: controller.signal,
       })
 
       if (uploadError) {
         throw uploadError
       }
 
-      // Insert DB row
-      const { data, error: dbError } = await supabase
-        .from("documents")
-        .insert({
+      // Insert DB row via API
+      const data = await api.post<Document>("/documents", {
+        body: {
           id: documentId,
-          user_id: user.id,
           title: file.name.replace(/\.pdf$/i, ""),
           file_path: filePath,
           file_size: file.size,
-        })
-        .select()
-        .single()
+        },
+        timeout: 120_000,
+      })
 
-      if (dbError) {
-        // Cleanup storage on DB failure
-        await supabase.storage.from("documents").remove([filePath])
-        throw dbError
-      }
-
-      setDocuments((prev) => [data as Document, ...prev])
-      toast.success("Document uploaded successfully")
+      setDocuments((prev) => [data, ...prev])
+      toast.success("Document uploaded · Processing started", {
+        action: {
+          label: "View",
+          onClick: () => {
+            window.location.href = `/documents/${documentId}`
+          },
+        },
+      })
       setPendingFile(null)
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Upload failed"
-      toast.error(message)
-      // Keep pendingFile for retry
+      // If the upload was cancelled via AbortController, don't show an error
+      if (error instanceof Error && error.name === "AbortError") {
+        setPendingFile(null)
+      } else {
+        const message =
+          error instanceof Error ? error.message : "Upload failed"
+        toast.error(message)
+        // Keep pendingFile for retry
+      }
     } finally {
+      abortControllerRef.current = null
       setUploading(false)
       setUploadProgress(0)
     }
@@ -139,11 +208,123 @@ export function DocumentsView({
     }
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) {
-      handleUpload(file)
+  function handleCancelUpload() {
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    setUploading(false)
+    setUploadProgress(0)
+    setPendingFile(null)
+  }
+
+  const processBulkUpload = useCallback(async () => {
+    if (bulkProcessingRef.current) return
+    bulkProcessingRef.current = true
+
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      toast.error("Not authenticated")
+      bulkProcessingRef.current = false
+      return
     }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      toast.error("No auth session")
+      bulkProcessingRef.current = false
+      return
+    }
+
+    // Get current queued items from the store
+    const queuedItems = useBulkUploadStore.getState().items.filter(
+      (item) => item.status === "queued"
+    )
+
+    for (const item of queuedItems) {
+      // Mark as uploading
+      updateItem(item.id, { status: "uploading", progress: 0 })
+
+      const documentId = uuid()
+      const filePath = `${user.id}/${documentId}.pdf`
+
+      try {
+        const { error: uploadError } = await uploadWithProgress({
+          bucket: "documents",
+          path: filePath,
+          file: item.file,
+          contentType: "application/pdf",
+          upsert: false,
+          onProgress: (percent) => {
+            updateItem(item.id, { progress: percent })
+          },
+          token,
+        })
+
+        if (uploadError) {
+          throw uploadError
+        }
+
+        // Create document entry via API
+        const data = await api.post<Document>("/documents", {
+          body: {
+            id: documentId,
+            title: item.file.name.replace(/\.pdf$/i, ""),
+            file_path: filePath,
+            file_size: item.file.size,
+          },
+          timeout: 120_000,
+        })
+
+        // Mark as complete in store
+        updateItem(item.id, { status: "complete", progress: 100 })
+
+        // Update local documents state
+        setDocuments((prev) => [data, ...prev])
+
+        // Invalidate documents query cache
+        if (activeWorkspaceId) {
+          queryClient.invalidateQueries({
+            queryKey: documentKeys.all(activeWorkspaceId),
+          })
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Upload failed"
+        updateItem(item.id, { status: "failed", error: message })
+      }
+    }
+
+    bulkProcessingRef.current = false
+  }, [updateItem, activeWorkspaceId, queryClient])
+
+  // Trigger bulk processing when new queued items appear
+  useEffect(() => {
+    const hasQueued = bulkItems.some((item) => item.status === "queued")
+    if (hasQueued && !bulkProcessingRef.current) {
+      processBulkUpload()
+    }
+  }, [bulkItems, processBulkUpload])
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    if (files.length === 1) {
+      // Single file: use existing upload flow
+      handleUpload(files[0])
+    } else {
+      // Multiple files: use bulk upload store
+      const fileArray = Array.from(files)
+      const result = addFiles(fileArray)
+      if (!result.accepted) {
+        toast.error(result.error ?? "Bulk upload failed")
+      }
+    }
+
     // Reset input so the same file can be re-selected
     e.target.value = ""
   }
@@ -151,9 +332,19 @@ export function DocumentsView({
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) {
-      handleUpload(file)
+    const files = e.dataTransfer.files
+    if (!files || files.length === 0) return
+
+    if (files.length === 1) {
+      // Single file: use existing upload flow
+      handleUpload(files[0])
+    } else {
+      // Multiple files: use bulk upload store
+      const fileArray = Array.from(files)
+      const result = addFiles(fileArray)
+      if (!result.accepted) {
+        toast.error(result.error ?? "Bulk upload failed")
+      }
     }
   }
 
@@ -173,7 +364,8 @@ export function DocumentsView({
     const prev = documents
     setDocuments((d) => d.filter((item) => item.id !== doc.id))
 
-    // Delete from storage
+    // Delete from storage via Supabase (binary file)
+    const supabase = createClient()
     const { error: storageError } = await supabase.storage
       .from("documents")
       .remove([doc.file_path])
@@ -182,33 +374,31 @@ export function DocumentsView({
       console.error("Storage delete error:", storageError)
     }
 
-    // Delete from DB
-    const { error: dbError } = await supabase
-      .from("documents")
-      .delete()
-      .eq("id", doc.id)
-
-    if (dbError) {
-      toast.error("Failed to delete document")
-      setDocuments(prev)
-      return
-    }
-
-    toast.success("Document deleted")
+    // Delete from DB via API
+    deleteDocMutation.mutate(doc.id, {
+      onError: (error) => {
+        handleError(error as unknown as ApiClientError)
+        setDocuments(prev)
+      },
+    })
   }
 
-  async function handleUpdateTitle(id: string, title: string) {
+  function handleUpdateTitle(id: string, title: string) {
     setDocuments((prev) =>
       prev.map((doc) => (doc.id === id ? { ...doc, title } : doc))
     )
 
-    await supabase
-      .from("documents")
-      .update({ title, updated_at: new Date().toISOString() })
-      .eq("id", id)
+    updateDocMutation.mutate(
+      { id, title },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+        },
+      },
+    )
   }
 
-  async function handleAddTag(id: string, tag: string) {
+  function handleAddTag(id: string, tag: string) {
     const trimmed = tag.trim().toLowerCase()
     if (!trimmed) return
 
@@ -220,13 +410,17 @@ export function DocumentsView({
       prev.map((d) => (d.id === id ? { ...d, tags: newTags } : d))
     )
 
-    await supabase
-      .from("documents")
-      .update({ tags: newTags, updated_at: new Date().toISOString() })
-      .eq("id", id)
+    updateDocMutation.mutate(
+      { id, tags: newTags },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+        },
+      },
+    )
   }
 
-  async function handleRemoveTag(id: string, tag: string) {
+  function handleRemoveTag(id: string, tag: string) {
     const doc = documents.find((d) => d.id === id)
     if (!doc) return
 
@@ -235,75 +429,105 @@ export function DocumentsView({
       prev.map((d) => (d.id === id ? { ...d, tags: newTags } : d))
     )
 
-    await supabase
-      .from("documents")
-      .update({ tags: newTags, updated_at: new Date().toISOString() })
-      .eq("id", id)
+    updateDocMutation.mutate(
+      { id, tags: newTags },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+        },
+      },
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Upload zone */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
-          dragOver
-            ? "border-blue-500 bg-blue-500/5"
-            : "border-app hover:border-blue-500/50"
-        }`}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          onChange={handleFileSelect}
-          className="hidden"
-          aria-label="Select PDF file to upload"
-        />
-
-        {uploading ? (
-          <div className="space-y-3">
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-            <p className="text-sm text-app-muted">
-              Uploading... {uploadProgress}%
-            </p>
-            <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-app-elevated">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          </div>
-        ) : pendingFile ? (
-          <div className="space-y-3">
-            <p className="text-sm text-red-500">Upload failed</p>
-            <button
-              onClick={handleRetry}
-              className="btn-primary-app inline-flex items-center gap-2 px-4 py-2 text-sm"
-              aria-label="Retry upload"
-            >
-              <RotateCcw size={16} />
-              Retry
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <Upload size={32} className="mx-auto text-app-muted" />
-            <p className="text-sm text-app-muted">
-              Drag and drop a PDF here, or{" "}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="text-blue-500 underline hover:text-blue-600"
-              >
-                browse files
-              </button>
-            </p>
-            <p className="text-xs text-app-muted">PDF only, max 50 MB</p>
-          </div>
-        )}
+      {/* ARIA live region for status change announcements */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {documents
+          .filter((doc) => doc.processing.status === "ready")
+          .map((doc) => (
+            <span key={doc.id}>Document {doc.title} is ready.</span>
+          ))}
       </div>
+
+      {/* Status updates paused banner */}
+      {isPollPaused && (
+        <div className="rounded-xl bg-yellow-500/10 px-4 py-2 text-sm text-yellow-600 dark:text-yellow-400">
+          Status updates paused — check your connection
+        </div>
+      )}
+
+      {/* Upload zone */}
+      {!isReadOnly && (
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+            dragOver
+              ? "border-blue-500 bg-blue-500/5"
+              : "border-app hover:border-blue-500/50"
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            aria-label="Select PDF file to upload"
+          />
+
+          {uploading ? (
+            <div className="space-y-3">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              <p className="text-sm text-app-muted">
+                Uploading... {uploadProgress}%
+              </p>
+              <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-app-elevated">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <button
+                onClick={handleCancelUpload}
+                className="text-sm text-app-muted hover:text-red-500"
+                aria-label="Cancel upload"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : pendingFile ? (
+            <div className="space-y-3">
+              <p className="text-sm text-red-500">Upload failed</p>
+              <button
+                onClick={handleRetry}
+                className="btn-primary-app inline-flex items-center gap-2 px-4 py-2 text-sm"
+                aria-label="Retry upload"
+              >
+                <RotateCcw size={16} />
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Upload size={32} className="mx-auto text-app-muted" />
+              <p className="text-sm text-app-muted">
+                Drag and drop a PDF here, or{" "}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-blue-500 underline hover:text-blue-600"
+                >
+                  browse files
+                </button>
+              </p>
+              <p className="text-xs text-app-muted">PDF only, max 50 MB</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search and filters */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -378,50 +602,87 @@ export function DocumentsView({
         </div>
       )}
 
-      {/* No results */}
-      {documents.length > 0 && filteredDocuments.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-app p-8 text-center text-app-muted">
-          No documents match your search.
-        </div>
+      {/* API-powered search results */}
+      {debouncedSearch.trim().length >= 2 ? (
+        isSearching ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="item-app animate-pulse rounded-xl px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-[18px] w-[18px] rounded bg-app-elevated" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-2/3 rounded bg-app-elevated" />
+                    <div className="h-3 w-full rounded bg-app-elevated" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : searchResults && searchResults.length > 0 ? (
+          <div className="space-y-2">
+            {searchResults.map((result) => (
+              <DocumentSearchResultCard key={result.document.id} result={result} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-app p-8 text-center text-app-muted">
+            No documents match your search.
+          </div>
+        )
+      ) : (
+        <>
+          {/* No results */}
+          {documents.length > 0 && filteredDocuments.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-app p-8 text-center text-app-muted">
+              No documents match your search.
+            </div>
+          )}
+
+          {/* Document grid/list */}
+          {viewMode === "grid" ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredDocuments.map((doc) => (
+                <DocumentCard
+                  key={doc.id}
+                  document={doc}
+                  isReadOnly={isReadOnly}
+                  onDelete={() => handleDelete(doc)}
+                  onUpdateTitle={(title) => handleUpdateTitle(doc.id, title)}
+                  onAddTag={(tag) => handleAddTag(doc.id, tag)}
+                  onRemoveTag={(tag) => handleRemoveTag(doc.id, tag)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredDocuments.map((doc) => (
+                <DocumentListItem
+                  key={doc.id}
+                  document={doc}
+                  isReadOnly={isReadOnly}
+                  onDelete={() => handleDelete(doc)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Document grid/list */}
-      {viewMode === "grid" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredDocuments.map((doc) => (
-            <DocumentCard
-              key={doc.id}
-              document={doc}
-              onDelete={() => handleDelete(doc)}
-              onUpdateTitle={(title) => handleUpdateTitle(doc.id, title)}
-              onAddTag={(tag) => handleAddTag(doc.id, tag)}
-              onRemoveTag={(tag) => handleRemoveTag(doc.id, tag)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredDocuments.map((doc) => (
-            <DocumentListItem
-              key={doc.id}
-              document={doc}
-              onDelete={() => handleDelete(doc)}
-            />
-          ))}
-        </div>
-      )}
+      <BulkUploadQueue />
     </div>
   )
 }
 
 function DocumentCard({
   document: doc,
+  isReadOnly,
   onDelete,
   onUpdateTitle,
   onAddTag,
   onRemoveTag,
 }: {
   document: Document
+  isReadOnly: boolean
   onDelete: () => void
   onUpdateTitle: (title: string) => void
   onAddTag: (tag: string) => void
@@ -430,6 +691,7 @@ function DocumentCard({
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(doc.title)
   const [tagInput, setTagInput] = useState("")
+  const retryMutation = useRetryDocumentProcessing()
 
   function handleTitleBlur() {
     setEditingTitle(false)
@@ -451,85 +713,106 @@ function DocumentCard({
   }
 
   return (
-    <div className="card-app flex flex-col gap-3 p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/10">
-          <FileText size={20} className="text-red-500" />
+    <div className="card-app flex flex-col gap-3 overflow-hidden">
+      {/* Thumbnail header */}
+      <DocumentThumbnail
+        thumbnailUrl={doc.thumbnail_url}
+        title={doc.title}
+        size="card"
+      />
+
+      <div className="flex flex-col gap-3 px-4 pb-4">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {editingTitle ? (
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={(e) => e.key === "Enter" && handleTitleBlur()}
+                autoFocus
+                className="w-full bg-transparent text-sm font-semibold outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => !isReadOnly && setEditingTitle(true)}
+                disabled={isReadOnly}
+                className="w-full text-left text-sm font-semibold hover:text-blue-500 disabled:hover:text-inherit"
+              >
+                {doc.title}
+              </button>
+            )}
+            <p className="text-xs text-app-muted" suppressHydrationWarning>
+              {doc.file_size
+                ? `${(doc.file_size / 1024 / 1024).toFixed(1)} MB`
+                : ""}{" "}
+              · {new Date(doc.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          {editingTitle ? (
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={(e) => e.key === "Enter" && handleTitleBlur()}
-              autoFocus
-              className="w-full bg-transparent text-sm font-semibold outline-none"
-            />
-          ) : (
-            <button
-              onClick={() => setEditingTitle(true)}
-              className="w-full text-left text-sm font-semibold hover:text-blue-500"
+
+        {/* Processing indicator */}
+        <ProcessingIndicator
+          status={doc.processing.status}
+          currentStage={doc.processing.current_stage}
+          onRetry={() => retryMutation.mutate(doc.id)}
+          retryLoading={retryMutation.isPending}
+        />
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1">
+          {(doc.tags ?? []).map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 rounded-lg bg-app-elevated px-2 py-0.5 text-xs text-app-muted"
             >
-              {doc.title}
+              {tag}
+              {!isReadOnly && (
+                <button
+                  onClick={() => onRemoveTag(tag)}
+                  className="hover:text-red-500"
+                  aria-label={`Remove tag ${tag}`}
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </span>
+          ))}
+          {!isReadOnly && (
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onBlur={() => {
+                if (tagInput.trim()) {
+                  onAddTag(tagInput)
+                  setTagInput("")
+                }
+              }}
+              placeholder="+ tag"
+              className="w-16 bg-transparent text-xs text-app-muted outline-none placeholder:text-app-muted/50"
+              aria-label="Add tag"
+            />
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 border-t border-app pt-3">
+          <Link
+            href={`/documents/${doc.id}`}
+            className="btn-primary-app px-3 py-1.5 text-xs"
+          >
+            Open
+          </Link>
+          {!isReadOnly && (
+            <button
+              onClick={onDelete}
+              className="ml-auto text-xs text-red-500 hover:text-red-600"
+            >
+              Delete
             </button>
           )}
-          <p className="text-xs text-app-muted" suppressHydrationWarning>
-            {doc.file_size
-              ? `${(doc.file_size / 1024 / 1024).toFixed(1)} MB`
-              : ""}{" "}
-            · {new Date(doc.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-          </p>
         </div>
-      </div>
-
-      {/* Tags */}
-      <div className="flex flex-wrap gap-1">
-        {(doc.tags ?? []).map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-1 rounded-lg bg-app-elevated px-2 py-0.5 text-xs text-app-muted"
-          >
-            {tag}
-            <button
-              onClick={() => onRemoveTag(tag)}
-              className="hover:text-red-500"
-              aria-label={`Remove tag ${tag}`}
-            >
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-        <input
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={handleTagKeyDown}
-          onBlur={() => {
-            if (tagInput.trim()) {
-              onAddTag(tagInput)
-              setTagInput("")
-            }
-          }}
-          placeholder="+ tag"
-          className="w-16 bg-transparent text-xs text-app-muted outline-none placeholder:text-app-muted/50"
-          aria-label="Add tag"
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 border-t border-app pt-3">
-        <Link
-          href={`/documents/${doc.id}`}
-          className="btn-primary-app px-3 py-1.5 text-xs"
-        >
-          Open
-        </Link>
-        <button
-          onClick={onDelete}
-          className="ml-auto text-xs text-red-500 hover:text-red-600"
-        >
-          Delete
-        </button>
       </div>
     </div>
   )
@@ -537,14 +820,22 @@ function DocumentCard({
 
 function DocumentListItem({
   document: doc,
+  isReadOnly,
   onDelete,
 }: {
   document: Document
+  isReadOnly: boolean
   onDelete: () => void
 }) {
+  const retryMutation = useRetryDocumentProcessing()
+
   return (
     <div className="item-app flex items-center gap-4 rounded-xl px-4 py-3">
-      <FileText size={18} className="shrink-0 text-red-500" />
+      <DocumentThumbnail
+        thumbnailUrl={doc.thumbnail_url}
+        title={doc.title}
+        size="list"
+      />
       <div className="min-w-0 flex-1">
         <Link
           href={`/documents/${doc.id}`}
@@ -561,6 +852,12 @@ function DocumentListItem({
               · {(doc.tags ?? []).join(", ")}
             </span>
           )}
+          <ProcessingIndicator
+            status={doc.processing.status}
+            currentStage={doc.processing.current_stage}
+            onRetry={() => retryMutation.mutate(doc.id)}
+            retryLoading={retryMutation.isPending}
+          />
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -570,12 +867,14 @@ function DocumentListItem({
         >
           Open
         </Link>
-        <button
-          onClick={onDelete}
-          className="text-xs text-red-500 hover:text-red-600"
-        >
-          Delete
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={onDelete}
+            className="text-xs text-red-500 hover:text-red-600"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   )

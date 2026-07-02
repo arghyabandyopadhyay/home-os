@@ -1,9 +1,34 @@
 /** @deprecated Use usePreferences() — kept for one-off reads before provider mounts */
+import { createServerApiClient } from "@/lib/api-client/server"
 import type { UserPreferences } from "@/types/user-preferences";
 
 const ONBOARDING_KEY = "home-os:onboarding-complete";
 const PINNED_NOTES_KEY = "home-os:pinned-notes";
 const LOCAL_PREFS_KEY = "home-os:preferences-cache";
+
+// ─── Server data access ───────────────────────────────────────────────────────
+
+export async function getPreferences(): Promise<UserPreferences | null> {
+  try {
+    const api = await createServerApiClient()
+    return await api.get<UserPreferences>("/preferences")
+  } catch {
+    return null
+  }
+}
+
+export async function updatePreferences(
+  updates: Partial<UserPreferences>
+): Promise<UserPreferences | null> {
+  try {
+    const api = await createServerApiClient()
+    return await api.patch<UserPreferences>("/preferences", { body: updates })
+  } catch {
+    return null
+  }
+}
+
+// ─── Client-side localStorage helpers ─────────────────────────────────────────
 
 export function isOnboardingComplete(): boolean {
   if (typeof window === "undefined") return true;

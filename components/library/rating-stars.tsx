@@ -7,7 +7,7 @@ export function RatingStars({
   onChange,
 }: {
   value: number
-  onChange: (rating: number) => void
+  onChange?: (rating: number) => void
 }) {
   return (
     <div className="flex gap-1">
@@ -15,9 +15,8 @@ export function RatingStars({
         <button
           key={star}
           type="button"
-          onClick={() =>
-            onChange(star)
-          }
+          onClick={() => onChange?.(star)}
+          disabled={!onChange}
         >
           <Star
             size={16}

@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { CalendarEvent } from "@/types/calendar";
+import { createClientApiClient } from "@/lib/api-client";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 type EventCreateFormProps = {
   defaultDate: Date;
@@ -29,8 +33,7 @@ export function EventCreateForm({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<{ title?: string; startsAt?: string }>({});
-
-  const supabase = createClient();
+  const handleError = useApiErrorHandler();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,36 +51,23 @@ export function EventCreateForm({
     setSaving(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const insertPayload: Record<string, unknown> = {
-        user_id: user.id,
+      const body: Record<string, unknown> = {
         title: title.trim(),
         starts_at: new Date(startsAt).toISOString(),
         all_day: false,
-        source: "home_os",
         description: description.trim() || null,
       };
 
       if (endsAt) {
-        insertPayload.ends_at = new Date(endsAt).toISOString();
+        body.ends_at = new Date(endsAt).toISOString();
       }
 
-      const { data, error } = await supabase
-        .from("calendar_events")
-        .insert(insertPayload)
-        .select()
-        .single();
+      const data = await api.post<CalendarEvent>("/calendar/events", { body });
 
-      if (error) throw error;
-
-      onCreated(data as CalendarEvent);
+      onCreated(data);
       toast.success("Event created");
-    } catch {
-      toast.error("Could not create event");
+    } catch (error) {
+      handleError(error as ApiClientError);
     } finally {
       setSaving(false);
     }

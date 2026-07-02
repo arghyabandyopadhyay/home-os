@@ -9,6 +9,9 @@ import { useRouter } from "next/navigation"
 import { validateUploadFile } from "@/lib/documents-utils"
 import { uploadWithProgress } from "@/lib/upload-with-progress"
 import { EmptyState } from "@/components/shared/empty-state"
+import { createClientApiClient } from "@/lib/api-client"
+
+const api = createClientApiClient()
 
 export function DocumentsEmptyState() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -26,6 +29,7 @@ export function DocumentsEmptyState() {
       return
     }
 
+    // File upload still uses Supabase Storage for the binary upload
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -61,20 +65,16 @@ export function DocumentsEmptyState() {
 
       if (uploadError) throw uploadError
 
-      const { error: dbError } = await supabase
-        .from("documents")
-        .insert({
+      // Insert document metadata via API
+      await api.post("/documents", {
+        body: {
           id: documentId,
-          user_id: user.id,
           title: file.name.replace(/\.pdf$/i, ""),
           file_path: filePath,
           file_size: file.size,
-        })
-
-      if (dbError) {
-        await supabase.storage.from("documents").remove([filePath])
-        throw dbError
-      }
+        },
+        timeout: 120_000,
+      })
 
       toast.success("Document uploaded", { id: uploadToast })
       router.refresh()

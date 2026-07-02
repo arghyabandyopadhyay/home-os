@@ -2,33 +2,29 @@
 
 import { useRouter } from "next/navigation";
 import { NotebookPen } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useCreateNote } from "@/hooks/queries/use-notes";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 export function NotesEmptyState() {
   const router = useRouter();
-  const supabase = createClient();
+  const createNoteMutation = useCreateNote();
+  const handleError = useApiErrorHandler();
 
-  async function handleCreate() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("notes")
-      .insert({
-        user_id: user.id,
-        title: "Untitled",
-        content: "",
-      })
-      .select()
-      .single();
-
-    if (error || !data) return;
-
-    router.push(`/notes/${data.id}`);
-    router.refresh();
+  function handleCreate() {
+    createNoteMutation.mutate(
+      { title: "Untitled", content: "" },
+      {
+        onSuccess: (data) => {
+          router.push(`/notes/${data.id}`);
+          router.refresh();
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+        },
+      },
+    );
   }
 
   return (

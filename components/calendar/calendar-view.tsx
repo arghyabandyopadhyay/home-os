@@ -2,14 +2,18 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, ExternalLink } from "lucide-react";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { CalendarEvent } from "@/types/calendar";
 import type { Task } from "@/types/task";
 import { CalendarGrid } from "@/components/calendar/calendar-grid";
 import { DayPanel } from "@/components/calendar/day-panel";
 import { EventCreateForm } from "@/components/calendar/event-create-form";
+import { createClientApiClient } from "@/lib/api-client";
+import { useSyncGoogleCalendar, useConnectGoogleCalendar } from "@/hooks/queries/use-calendar";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 type CalendarViewProps = {
   initialEvents: CalendarEvent[];
@@ -33,13 +37,14 @@ export function CalendarView({
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [backgroundSyncing, setBackgroundSyncing] = useState(false);
   const [reconnectRequired, setReconnectRequired] = useState(false);
   const hasSyncedRef = useRef(false);
 
-  const supabase = createClient();
+  const syncMutation = useSyncGoogleCalendar();
+  const connectCalendar = useConnectGoogleCalendar();
+  const handleError = useApiErrorHandler();
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -53,31 +58,17 @@ export function CalendarView({
     async (y: number, m: number) => {
       setLoadingMonth(true);
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const start = new Date(y, m, 1);
-        const end = new Date(y, m + 1, 0, 23, 59, 59);
-
-        const { data, error } = await supabase
-          .from("calendar_events")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("starts_at", start.toISOString())
-          .lte("starts_at", end.toISOString())
-          .order("starts_at", { ascending: true });
-
-        if (error) throw error;
-        setEvents((data || []) as CalendarEvent[]);
-      } catch {
-        toast.error("Could not load events");
+        const data = await api.get<CalendarEvent[]>("/calendar/events", {
+          params: { year: y, month: m },
+        });
+        setEvents(data || []);
+      } catch (error) {
+        handleError(error as unknown as ApiClientError);
       } finally {
         setLoadingMonth(false);
       }
     },
-    [supabase]
+    [handleError]
   );
 
   // Background sync on mount — fires exactly once per mount
@@ -88,19 +79,15 @@ export function CalendarView({
     const doSync = async () => {
       setBackgroundSyncing(true);
       try {
-        const response = await fetch("/api/google-calendar/sync", { method: "POST" });
-        if (response.status === 401) {
-          const data = await response.json();
-          if (data.error === "reconnect_required") {
-            setReconnectRequired(true);
-          }
-        } else if (!response.ok) {
-          toast.error("Could not sync Google Calendar");
+        await api.post<{ synced: number }>("/calendar/sync");
+        await fetchMonthEvents(year, month);
+      } catch (error) {
+        const err = error as unknown as ApiClientError;
+        if (err.type === "api" && err.status === 401) {
+          setReconnectRequired(true);
         } else {
-          await fetchMonthEvents(year, month);
+          toast.error("Could not sync Google Calendar");
         }
-      } catch {
-        toast.error("Could not sync Google Calendar");
       } finally {
         setBackgroundSyncing(false);
       }
@@ -154,41 +141,28 @@ export function CalendarView({
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
   }
 
-  async function syncGoogleCalendar() {
-    setSyncing(true);
-    try {
-      const response = await fetch("/api/google-calendar/sync", {
-        method: "POST",
-      });
-
-      if (response.status === 401) {
-        const data = await response.json();
-        if (data.error === "reconnect_required") {
+  function syncGoogleCalendar() {
+    syncMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        toast.success(`Synced ${data.synced} events`);
+        fetchMonthEvents(year, month);
+      },
+      onError: (error) => {
+        const err = error as unknown as ApiClientError;
+        if (err.type === "api" && err.status === 401) {
           setReconnectRequired(true);
           toast.error("Google Calendar needs to be reconnected");
-          return;
+        } else if (err.type === "api" && err.status === 404) {
+          toast.error("Google Calendar is not connected");
+        } else {
+          handleError(err);
         }
-      }
-
-      if (response.status === 404) {
-        toast.error("Google Calendar is not connected");
-        return;
-      }
-
-      if (!response.ok) {
-        toast.error("Could not sync Google Calendar");
-        return;
-      }
-
-      const data = await response.json();
-      toast.success(`Synced ${data.synced} events`);
-      await fetchMonthEvents(year, month);
-    } catch {
-      toast.error("Could not sync Google Calendar");
-    } finally {
-      setSyncing(false);
-    }
+      },
+    });
   }
+
+  // Suppress unused variable warning for reconnectRequired state
+  void reconnectRequired;
 
   return (
     <div className="space-y-4">
@@ -244,22 +218,30 @@ export function CalendarView({
             <button
               type="button"
               onClick={syncGoogleCalendar}
-              disabled={syncing}
+              disabled={syncMutation.isPending}
               className="inline-flex items-center gap-2 rounded-lg border border-app bg-app px-3 py-2 text-xs font-medium text-app-muted transition hover:bg-app-elevated hover:text-app disabled:opacity-50"
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
+                className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
               />
-              {syncing ? "Syncing" : "Sync Google"}
+              {syncMutation.isPending ? "Syncing" : "Sync Google"}
             </button>
           ) : (
-            <Link
-              href="/api/google-calendar/connect"
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const result = await connectCalendar.mutateAsync();
+                  window.location.href = result.url;
+                } catch (error) {
+                  handleError(error as ApiClientError);
+                }
+              }}
               className="inline-flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Connect Google
-            </Link>
+            </button>
           )}
         </div>
       </div>

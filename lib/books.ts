@@ -1,38 +1,51 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerApiClient } from "@/lib/api-client/server"
+import type { Book } from "@/types/book"
 
-export async function getBooks() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
-
-  const { data, error } = await supabase
-    .from("books")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", {
-      ascending: false,
-    });
-
-  if (error) {
-    console.error(error);
-    return [];
+export async function getBooks(): Promise<Book[]> {
+  const api = await createServerApiClient()
+  try {
+    return await api.get<Book[]>("/library")
+  } catch {
+    return []
   }
-
-  return data;
 }
 
-export async function getBook(id: string) {
-  const supabase = await createClient();
+export async function getBook(id: string): Promise<Book | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.get<Book>(`/library/${id}`)
+  } catch {
+    return null
+  }
+}
 
-  const { data } = await supabase
-    .from("books")
-    .select("*")
-    .eq("id", id)
-    .single();
+export async function addBook(input: Partial<Book>): Promise<Book | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.post<Book>("/library", { body: input })
+  } catch {
+    return null
+  }
+}
 
-  return data;
+export async function updateBook(
+  id: string,
+  updates: Partial<Book>
+): Promise<Book | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.patch<Book>(`/library/${id}`, { body: updates })
+  } catch {
+    return null
+  }
+}
+
+export async function removeBook(id: string): Promise<boolean> {
+  const api = await createServerApiClient()
+  try {
+    await api.delete(`/library/${id}`)
+    return true
+  } catch {
+    return false
+  }
 }

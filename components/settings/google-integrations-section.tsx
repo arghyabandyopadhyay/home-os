@@ -4,6 +4,17 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Calendar, Users, Link2, Unlink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  useDisconnectGoogleCalendar,
+  useSyncGoogleCalendar,
+  useConnectGoogleCalendar,
+} from "@/hooks/queries/use-calendar";
+import {
+  useConnectGoogleContacts,
+  useSyncGoogleContacts,
+} from "@/hooks/queries/use-contacts";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 type ConnectionStatus = {
   connected: boolean;
@@ -22,23 +33,34 @@ export function GoogleIntegrationsSection({
   const [calendarStatus, setCalendarStatus] = useState(calendarConnection);
   const [contactsStatus] = useState(contactsConnection);
   const [loading, setLoading] = useState<string | null>(null);
+  const handleApiError = useApiErrorHandler();
+
+  const disconnectCalendar = useDisconnectGoogleCalendar();
+  const syncCalendar = useSyncGoogleCalendar();
+  const connectCalendar = useConnectGoogleCalendar();
+  const connectContacts = useConnectGoogleContacts();
+  const syncContacts = useSyncGoogleContacts();
+
+  const handleCalendarConnect = async () => {
+    setLoading("calendar-connect");
+    try {
+      const result = await connectCalendar.mutateAsync();
+      window.location.href = result.url;
+    } catch (error) {
+      handleApiError(error as ApiClientError);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleCalendarDisconnect = async () => {
     setLoading("calendar-disconnect");
     try {
-      const res = await fetch("/api/google-calendar/disconnect", {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to disconnect");
-      }
+      await disconnectCalendar.mutateAsync();
       setCalendarStatus({ connected: false, email: null });
       toast.success("Google Calendar disconnected");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to disconnect";
-      toast.error(message);
+      handleApiError(error as ApiClientError);
     } finally {
       setLoading(null);
     }
@@ -47,18 +69,22 @@ export function GoogleIntegrationsSection({
   const handleCalendarSync = async () => {
     setLoading("calendar-sync");
     try {
-      const res = await fetch("/api/google-calendar/sync", {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to sync");
-      }
+      await syncCalendar.mutateAsync();
       toast.success("Calendar synced successfully");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to sync";
-      toast.error(message);
+      handleApiError(error as ApiClientError);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleContactsConnect = async () => {
+    setLoading("contacts-connect");
+    try {
+      const result = await connectContacts.mutateAsync();
+      window.location.href = result.url;
+    } catch (error) {
+      handleApiError(error as ApiClientError);
     } finally {
       setLoading(null);
     }
@@ -67,21 +93,12 @@ export function GoogleIntegrationsSection({
   const handleContactsSync = async () => {
     setLoading("contacts-sync");
     try {
-      const res = await fetch("/api/google-contacts/sync", {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to import contacts");
-      }
-      const data = await res.json();
+      const data = await syncContacts.mutateAsync();
       toast.success(
         `Contacts imported: ${data.imported ?? 0} new, ${data.updated ?? 0} updated`,
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to import contacts";
-      toast.error(message);
+      handleApiError(error as ApiClientError);
     } finally {
       setLoading(null);
     }
@@ -149,14 +166,14 @@ export function GoogleIntegrationsSection({
               </>
             ) : (
               <Button
-                asChild
+                onClick={handleCalendarConnect}
+                disabled={loading !== null}
                 size="sm"
                 className="rounded-xl bg-sky-500 text-white hover:bg-sky-400"
+                aria-label="Connect Google Calendar"
               >
-                <a href="/api/google-calendar/connect" aria-label="Connect Google Calendar">
-                  <Link2 className="mr-2 h-4 w-4" />
-                  Connect
-                </a>
+                <Link2 className="mr-2 h-4 w-4" />
+                {loading === "calendar-connect" ? "Connecting..." : "Connect"}
               </Button>
             )}
           </div>
@@ -192,14 +209,14 @@ export function GoogleIntegrationsSection({
               </Button>
             ) : (
               <Button
-                asChild
+                onClick={handleContactsConnect}
+                disabled={loading !== null}
                 size="sm"
                 className="rounded-xl bg-emerald-500 text-white hover:bg-emerald-400"
+                aria-label="Connect Google Contacts"
               >
-                <a href="/api/google-contacts/connect" aria-label="Connect Google Contacts">
-                  <Link2 className="mr-2 h-4 w-4" />
-                  Connect
-                </a>
+                <Link2 className="mr-2 h-4 w-4" />
+                {loading === "contacts-connect" ? "Connecting..." : "Connect"}
               </Button>
             )}
           </div>

@@ -1,52 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import {
-  fetchUserPreferences,
-} from "@/lib/user-settings";
 import { applyTheme } from "@/lib/theme";
 import type { UserPreferences } from "@/types/user-preferences";
 import { defaultUserPreferences } from "@/types/user-preferences";
 import { readLocalCache, writeLocalCache } from "@/lib/preferences-cache";
+import { createClientApiClient } from "@/lib/api-client";
 
-// Module-level stable client reference — createBrowserClient already returns a singleton internally
-const supabase = createClient();
+const api = createClientApiClient();
 
 export function useUserPreferences() {
   const [prefs, setPrefs] = useState<UserPreferences>(() => {
     return readLocalCache() ?? defaultUserPreferences;
   });
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
   const hasFetched = useRef(false);
   // Refs for stable update closure — avoids stale captures and dependency churn
   const prefsRef = useRef(prefs);
-  const userIdRef = useRef(userId);
   prefsRef.current = prefs;
-  userIdRef.current = userId;
 
   const load = useCallback(async () => {
     if (hasFetched.current) return;
     hasFetched.current = true;
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setUserId(null);
-        return;
-      }
-
-      setUserId(user.id);
-      const remote = await fetchUserPreferences(supabase, user.id);
+      const remote = await api.get<UserPreferences>("/preferences");
       const cached = prefsRef.current;
 
       // Determine if remote has real user data or just empty defaults
-      // The profiles.preferences column defaults to '{}', which mergePreferences
-      // turns into defaultUserPreferences. We detect this by checking if remote
-      // matches defaults exactly — if so, the user hasn't saved anything to remote yet.
       const remoteIsDefaults =
         remote.onboardingComplete === defaultUserPreferences.onboardingComplete &&
         remote.theme === defaultUserPreferences.theme &&
@@ -62,12 +42,10 @@ export function useUserPreferences() {
         // Remote has no real data but we have local state (from cache) — keep local
         // and sync our local state up to remote
         writeLocalCache(cached);
-        const { error } = await supabase
-          .from("profiles")
-          .update({ preferences: cached })
-          .eq("id", user.id);
-        if (error) {
-          console.warn("[preferences] Failed to sync local state to remote:", error.message);
+        try {
+          await api.patch("/preferences", { body: cached });
+        } catch {
+          console.warn("[preferences] Failed to sync local state to remote");
         }
       } else if (!remoteIsDefaults) {
         // Remote has real user data — use it but don't downgrade onboardingComplete
@@ -106,32 +84,8 @@ export function useUserPreferences() {
       writeLocalCache(optimistic);
       if (patch.theme) applyTheme(patch.theme);
 
-      // Get userId — if not yet available, fetch it now
-      let uid = userIdRef.current;
-      if (!uid) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            uid = user.id;
-            setUserId(uid);
-          }
-        } catch {
-          // Can't get user — skip remote save
-        }
-      }
-
-      if (!uid) return optimistic;
-
       try {
-        // Save the full optimistic state to remote — not just the patch
-        // This ensures remote always has the complete, up-to-date preferences
-        const { error } = await supabase
-          .from("profiles")
-          .update({ preferences: optimistic })
-          .eq("id", uid);
-        if (error) {
-          console.warn("[preferences] Remote write failed:", error.message);
-        }
+        await api.patch("/preferences", { body: optimistic });
       } catch {
         console.warn("[preferences] Remote write failed, keeping optimistic state");
       }

@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Calendar, ExternalLink, Plus, RefreshCw } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { CalendarEvent } from "@/types/calendar";
 import { toDateKey } from "@/lib/date";
+import { createClientApiClient } from "@/lib/api-client";
+import { useSyncGoogleCalendar, useConnectGoogleCalendar } from "@/hooks/queries/use-calendar";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 function formatTime(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -28,9 +32,10 @@ export function TodayCalendar({
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("09:00");
   const [adding, setAdding] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const syncMutation = useSyncGoogleCalendar();
+  const connectCalendar = useConnectGoogleCalendar();
+  const handleError = useApiErrorHandler();
 
   async function addEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -39,34 +44,18 @@ export function TodayCalendar({
 
     setAdding(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
       const startsAt = `${toDateKey()}T${time}:00`;
 
-      const { data, error } = await supabase
-        .from("calendar_events")
-        .insert({
-          user_id: user.id,
+      const data = await api.post<CalendarEvent>("/calendar/events", {
+        body: {
           title: trimmed,
           starts_at: startsAt,
           all_day: false,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === "42P01") {
-          toast.error("Run the v2 migration to enable calendar");
-          return;
-        }
-        throw error;
-      }
+        },
+      });
 
       setEvents((prev) =>
-        [...prev, data as CalendarEvent].sort(
+        [...prev, data].sort(
           (a, b) =>
             new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
         ),
@@ -74,36 +63,23 @@ export function TodayCalendar({
       setTitle("");
       toast.success("Event added");
       router.refresh();
-    } catch {
-      toast.error("Could not add event");
+    } catch (error) {
+      handleError(error as unknown as ApiClientError);
     } finally {
       setAdding(false);
     }
   }
 
-  async function syncGoogleCalendar() {
-    setSyncing(true);
-    try {
-      const response = await fetch("/api/google-calendar/sync", {
-        method: "POST",
-      });
-      const payload = (await response.json()) as {
-        events?: CalendarEvent[];
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Could not sync Google Calendar");
-      }
-
-      setEvents(payload.events || []);
-      toast.success("Google Calendar synced");
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
+  function syncGoogleCalendar() {
+    syncMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Google Calendar synced");
+        router.refresh();
+      },
+      onError: (error) => {
+        handleError(error as unknown as ApiClientError);
+      },
+    });
   }
 
   return (
@@ -117,22 +93,30 @@ export function TodayCalendar({
           <button
             type="button"
             onClick={syncGoogleCalendar}
-            disabled={syncing}
+            disabled={syncMutation.isPending}
             className="inline-flex items-center gap-2 rounded-lg border border-app bg-app px-3 py-2 text-xs font-medium text-app-muted transition hover:bg-app-elevated hover:text-app disabled:opacity-50"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
             />
-            {syncing ? "Syncing" : "Sync Google"}
+            {syncMutation.isPending ? "Syncing" : "Sync Google"}
           </button>
         ) : (
-          <Link
-            href="/api/google-calendar/connect"
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const result = await connectCalendar.mutateAsync();
+                window.location.href = result.url;
+              } catch (error) {
+                handleError(error as ApiClientError);
+              }
+            }}
             className="inline-flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Connect Google
-          </Link>
+          </button>
         )}
       </div>
 

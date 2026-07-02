@@ -2,65 +2,62 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
+import { useCreateTask } from "@/hooks/queries/use-tasks";
+import { useCreateNote } from "@/hooks/queries/use-notes";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 export function QuickCapture() {
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const createTaskMutation = useCreateTask();
+  const createNoteMutation = useCreateNote();
+  const handleError = useApiErrorHandler();
 
-  async function capture(asNote: boolean) {
+  function capture(asNote: boolean) {
     const text = value.trim();
     if (!text) return;
 
     setLoading(true);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
 
-      if (!user) {
-        toast.error("Sign in to capture");
-        return;
-      }
-
-      if (asNote) {
-        const { data, error } = await supabase
-          .from("notes")
-          .insert({
-            user_id: user.id,
-            title: text.slice(0, 80),
-            content: text,
-          })
-          .select("id")
-          .single();
-
-        if (error) throw error;
-        setValue("");
-        toast.success("Note saved");
-        router.push(`/notes/${data.id}`);
-        router.refresh();
-        return;
-      }
-
-      const { error } = await supabase.from("tasks").insert({
-        user_id: user.id,
-        title: text,
-        completed: false,
-      });
-
-      if (error) throw error;
-      setValue("");
-      toast.success("Task added");
-      router.refresh();
-    } catch {
-      toast.error("Could not save");
-    } finally {
-      setLoading(false);
+    if (asNote) {
+      createNoteMutation.mutate(
+        { title: text.slice(0, 80), content: text },
+        {
+          onSuccess: (data) => {
+            setValue("");
+            toast.success("Note saved");
+            router.push(`/notes/${data.id}`);
+            router.refresh();
+            setLoading(false);
+          },
+          onError: (error) => {
+            handleError(error as unknown as ApiClientError);
+            setLoading(false);
+          },
+        },
+      );
+      return;
     }
+
+    createTaskMutation.mutate(
+      { title: text },
+      {
+        onSuccess: () => {
+          setValue("");
+          toast.success("Task added");
+          router.refresh();
+          setLoading(false);
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setLoading(false);
+        },
+      },
+    );
   }
 
   return (

@@ -1,12 +1,17 @@
 "use client"
 
 import { Plus } from "lucide-react"
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions"
 
 export function TasksPageActions() {
+  const { isReadOnly } = useWorkspacePermissions()
+
   function handleAddTask() {
     // Dispatch a custom event that TasksList listens for
     window.dispatchEvent(new CustomEvent("tasks:create"))
   }
+
+  if (isReadOnly) return null
 
   return (
     <button

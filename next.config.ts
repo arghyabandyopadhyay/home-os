@@ -27,6 +27,13 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "avatars.githubusercontent.com",
       },
+      // Document thumbnails served from Supabase Storage
+      // Pattern: <project-ref>.supabase.co/storage/v1/object/...
+      // TODO: Replace with specific project hostname if a tighter pattern is preferred
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
     ],
   },
 };

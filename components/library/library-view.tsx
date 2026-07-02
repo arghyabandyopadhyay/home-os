@@ -4,7 +4,6 @@ import { useState, useRef } from "react";
 import { Plus, BookOpen } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
 import { Book } from "@/types/book";
 import { toast } from "sonner";
 import { v4 as uuid } from "uuid";
@@ -16,11 +15,18 @@ import { ProgressBar } from "./progress-bar";
 import { EmptyState } from "@/components/shared/empty-state";
 
 import { type GoogleBookResult } from "@/lib/google-books";
+import { useAddBook, useUpdateBook, useRemoveBook } from "@/hooks/queries/use-books";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions";
+import { createClientApiClient } from "@/lib/api-client";
+import type { ApiClientError } from "@/lib/api-client";
+import { createClient } from "@/lib/supabase/client";
+
+const api = createClientApiClient();
 
 const ITEMS_PER_SECTION = 5;
 
 export function LibraryView({ books: initialBooks }: { books: Book[] }) {
-  const supabase = createClient();
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const searchCacheRef = useRef<Record<string, GoogleBookResult>>({});
 
@@ -32,18 +38,14 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
   const [uploadingBookId, setUploadingBookId] = useState<string | null>(null);
   const [bookUploadProgress, setBookUploadProgress] = useState(0);
 
-  async function createBook() {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+  const addBookMutation = useAddBook();
+  const updateBookMutation = useUpdateBook();
+  const removeBookMutation = useRemoveBook();
+  const handleError = useApiErrorHandler();
+  const { isReadOnly } = useWorkspacePermissions();
 
-    if (userError || !user) {
-      toast.error("Failed to authenticate");
-      return;
-    }
-
-    const optimisticBook = {
+  function createBook() {
+    const optimisticBook: Book = {
       id: uuid(),
       title: "",
       author: "",
@@ -68,28 +70,23 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
     setBooks((prev) => [optimisticBook, ...prev]);
 
-    const { data, error } = await supabase
-      .from("books")
-      .insert({
-        user_id: user.id,
-        title: "Untitled Book",
-        author: "",
-      })
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Failed to add book");
-      setBooks((prev) => prev.filter((book) => book.id !== optimisticBook.id));
-      return;
-    }
-
-    setBooks((prev) =>
-      prev.map((book) => (book.id === optimisticBook.id ? data : book)),
+    addBookMutation.mutate(
+      { title: "Untitled Book", author: "" },
+      {
+        onSuccess: (data) => {
+          setBooks((prev) =>
+            prev.map((book) => (book.id === optimisticBook.id ? data : book)),
+          );
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setBooks((prev) => prev.filter((book) => book.id !== optimisticBook.id));
+        },
+      },
     );
   }
 
-  async function autofillBook(id: string, title: string) {
+  function autofillBook(id: string, title: string) {
     if (!title) return;
 
     if (debounceTimerRef.current) {
@@ -118,16 +115,21 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
             ),
           );
 
-          await supabase.from("books").update(updates).eq("id", id);
+          updateBookMutation.mutate(
+            { id, ...updates },
+            {
+              onError: (error) => {
+                handleError(error as unknown as ApiClientError);
+              },
+            },
+          );
           toast.success("Book details filled from cache");
           return;
         }
 
-        const result = await fetch(
-          `/api/search-books?q=${encodeURIComponent(title)}`,
-        )
-          .then((res) => res.json())
-          .then((data) => data.data as GoogleBookResult | null);
+        const result = await api.get<GoogleBookResult | null>("/library/search", {
+          params: { q: title },
+        });
 
         if (!result) {
           toast.error("Book not found on Google Books");
@@ -154,20 +156,17 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
           ),
         );
 
-        const { error } = await supabase
-          .from("books")
-          .update(updates)
-          .eq("id", id);
-
-        if (error) {
-          toast.error("Failed to update book");
-          console.error("Update error:", error);
-          return;
-        }
+        updateBookMutation.mutate(
+          { id, ...updates },
+          {
+            onError: (error) => {
+              handleError(error as unknown as ApiClientError);
+            },
+          },
+        );
 
         toast.success("Book details filled automatically");
       } catch (error) {
-        console.error("Autofill error:", error);
         if (error instanceof Error && error.message.includes("Rate limited")) {
           toast.error("Rate limited. Please wait before trying again");
         } else {
@@ -177,24 +176,38 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
     }, 800);
   }
 
-  async function updateBook(id: string, updates: Partial<Book>) {
+  function updateBook(id: string, updates: Partial<Book>) {
     setBooks((prev) =>
       prev.map((book) =>
         book.id === id ? { ...book, ...updates } : book,
       ),
     );
 
-    await supabase.from("books").update(updates).eq("id", id);
+    updateBookMutation.mutate(
+      { id, ...updates },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+        },
+      },
+    );
   }
 
-  async function deleteBook(id: string) {
+  function deleteBook(id: string) {
     setBooks((prev) => prev.filter((book) => book.id !== id));
-    await supabase.from("books").delete().eq("id", id);
+    removeBookMutation.mutate(id, {
+      onError: (error) => {
+        handleError(error as unknown as ApiClientError);
+      },
+    });
   }
 
   async function uploadBookFile(bookId: string, file?: File) {
     if (!file) return;
 
+    // File upload still needs Supabase Storage for the actual file upload
+    // The metadata update goes through the API
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -230,13 +243,18 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
         throw error;
       }
 
-      await supabase
-        .from("books")
-        .update({
+      updateBookMutation.mutate(
+        {
+          id: bookId,
           file_path: path,
           file_type: extension,
-        })
-        .eq("id", bookId);
+        },
+        {
+          onError: (error) => {
+            handleError(error as unknown as ApiClientError);
+          },
+        },
+      );
 
       toast.success("Book uploaded");
     } catch (error) {
@@ -278,8 +296,8 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
         icon={BookOpen}
         heading="Start building your library"
         body="Add books you're reading, want to read, or have finished to track your reading journey."
-        actionLabel="Add your first book"
-        onAction={createBook}
+        actionLabel={isReadOnly ? undefined : "Add your first book"}
+        onAction={isReadOnly ? undefined : createBook}
       />
     );
   }
@@ -295,13 +313,15 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
             className="input-app w-full px-4 py-3"
           />
         </div>
-        <button
-          onClick={createBook}
-          className="btn-primary-app flex items-center gap-2 px-4 py-3"
-        >
-          <Plus size={18} />
-          Add Book
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={createBook}
+            className="btn-primary-app flex items-center gap-2 px-4 py-3"
+          >
+            <Plus size={18} />
+            Add Book
+          </button>
+        )}
       </div>
 
       {/* Currently Reading Section */}
@@ -315,6 +335,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
               <BookCard
                 key={book.id}
                 book={book}
+                isReadOnly={isReadOnly}
                 onUpdate={updateBook}
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
@@ -346,6 +367,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
               <BookCard
                 key={book.id}
                 book={book}
+                isReadOnly={isReadOnly}
                 onUpdate={updateBook}
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
@@ -377,6 +399,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
               <BookCard
                 key={book.id}
                 book={book}
+                isReadOnly={isReadOnly}
                 onUpdate={updateBook}
                 onDelete={deleteBook}
                 onAutofill={autofillBook}
@@ -404,6 +427,7 @@ export function LibraryView({ books: initialBooks }: { books: Book[] }) {
 
 function BookCard({
   book,
+  isReadOnly,
   onUpdate,
   onDelete,
   onAutofill,
@@ -412,6 +436,7 @@ function BookCard({
   uploadProgress,
 }: {
   book: Book;
+  isReadOnly: boolean;
   onUpdate: (id: string, updates: Partial<Book>) => void;
   onDelete: (id: string) => void;
   onAutofill: (id: string, title: string) => void;
@@ -443,6 +468,7 @@ function BookCard({
         placeholder="Book title"
         onChange={(e) => onUpdate(book.id, { title: e.target.value })}
         onBlur={() => onAutofill(book.id, book.title)}
+        readOnly={isReadOnly}
         className="mb-2 w-full bg-transparent text-lg font-semibold outline-none"
       />
 
@@ -450,12 +476,14 @@ function BookCard({
         value={book.author || ""}
         placeholder="Author"
         onChange={(e) => onUpdate(book.id, { author: e.target.value })}
+        readOnly={isReadOnly}
         className="mb-4 w-full bg-transparent text-sm text-app-muted outline-none"
       />
 
       <select
         value={book.status}
         onChange={(e) => onUpdate(book.id, { status: e.target.value })}
+        disabled={isReadOnly}
         className={`mb-4 w-full rounded-xl border border-app p-2 text-sm ${
           book.status === "finished"
             ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
@@ -472,31 +500,40 @@ function BookCard({
       <div className="mb-4">
         <RatingStars
           value={book.rating}
-          onChange={(rating) => onUpdate(book.id, { rating })}
+          onChange={isReadOnly ? undefined : (rating) => onUpdate(book.id, { rating })}
         />
       </div>
 
       <div className="mb-4">
         <ProgressBar value={book.progress} />
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={book.progress}
-          onChange={(e) =>
-            onUpdate(book.id, { progress: Number(e.target.value) })
-          }
-          className="mt-2 w-full"
-        />
+        {!isReadOnly && (
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={book.progress}
+            onChange={(e) =>
+              onUpdate(book.id, { progress: Number(e.target.value) })
+            }
+            className="mt-2 w-full"
+          />
+        )}
       </div>
 
-      <TextareaAutosize
-        minRows={3}
-        value={book.notes || ""}
-        placeholder="Notes..."
-        onChange={(e) => onUpdate(book.id, { notes: e.target.value })}
-        className="mt-4 w-full resize-none rounded-xl border border-app bg-app p-3 text-sm outline-none"
-      />
+      {!isReadOnly && (
+        <TextareaAutosize
+          minRows={3}
+          value={book.notes || ""}
+          placeholder="Notes..."
+          onChange={(e) => onUpdate(book.id, { notes: e.target.value })}
+          className="mt-4 w-full resize-none rounded-xl border border-app bg-app p-3 text-sm outline-none"
+        />
+      )}
+      {isReadOnly && book.notes && (
+        <p className="mt-4 whitespace-pre-wrap rounded-xl border border-app bg-app p-3 text-sm text-app-muted">
+          {book.notes}
+        </p>
+      )}
 
       {book.description && (
         <p className="mt-4 line-clamp-2 text-sm text-app-muted">
@@ -527,12 +564,14 @@ function BookCard({
         )}
       </div>
 
-      <input
-        type="file"
-        accept=".epub,.pdf,application/epub+zip,application/pdf"
-        onChange={(e) => onUpload(book.id, e.target.files?.[0])}
-        disabled={isUploading}
-      />
+      {!isReadOnly && (
+        <input
+          type="file"
+          accept=".epub,.pdf,application/epub+zip,application/pdf"
+          onChange={(e) => onUpload(book.id, e.target.files?.[0])}
+          disabled={isUploading}
+        />
+      )}
 
       {isUploading && (
         <div className="mt-2 space-y-1">
@@ -555,12 +594,14 @@ function BookCard({
         </Link>
       )}
 
-      <button
-        onClick={() => onDelete(book.id)}
-        className="mt-3 text-sm text-red-500 transition hover:text-red-600"
-      >
-        Delete
-      </button>
+      {!isReadOnly && (
+        <button
+          onClick={() => onDelete(book.id)}
+          className="mt-3 text-sm text-red-500 transition hover:text-red-600"
+        >
+          Delete
+        </button>
+      )}
     </div>
   );
 }

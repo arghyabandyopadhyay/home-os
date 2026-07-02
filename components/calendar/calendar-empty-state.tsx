@@ -1,11 +1,23 @@
 "use client";
 
 import { CalendarDays } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useConnectGoogleCalendar } from "@/hooks/queries/use-calendar";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 export function CalendarEmptyState() {
-  const router = useRouter();
+  const connectCalendar = useConnectGoogleCalendar();
+  const handleError = useApiErrorHandler();
+
+  async function handleConnect() {
+    try {
+      const result = await connectCalendar.mutateAsync();
+      window.location.href = result.url;
+    } catch (error) {
+      handleError(error as ApiClientError);
+    }
+  }
 
   return (
     <EmptyState
@@ -14,7 +26,7 @@ export function CalendarEmptyState() {
       heading="Your calendar is waiting"
       body="Create your first event or connect Google Calendar to see your schedule here."
       actionLabel="Connect Google Calendar"
-      onAction={() => router.push("/api/google-calendar/connect")}
+      onAction={handleConnect}
     />
   );
 }

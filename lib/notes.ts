@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServerApiClient } from "@/lib/api-client/server"
+import type { Note } from "@/types/note"
 
 // Re-export pure functions from notes-utils (safe for client components)
 export {
@@ -11,87 +12,53 @@ export {
 
 // --- Server functions ---
 
-export async function getNotes() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return []
-
-  const { data, error } = await supabase
-    .from("notes")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("updated_at", {
-      ascending: false,
-    })
-
-  if (error) {
-    console.error(error)
+export async function getNotes(): Promise<Note[]> {
+  const api = await createServerApiClient()
+  try {
+    return await api.get<Note[]>("/notes")
+  } catch {
     return []
   }
-
-  return data
 }
 
-export async function createNote() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return null
-
-  const { data, error } = await supabase
-    .from("notes")
-    .insert({
-      user_id: user.id,
-      title: "Untitled",
-      content: "",
+export async function createNote(): Promise<Note | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.post<Note>("/notes", {
+      body: { title: "Untitled", content: "" },
     })
-    .select()
-    .single()
-
-  if (error) {
-    console.error(error)
+  } catch {
     return null
   }
-
-  return data
 }
 
-export async function getNote(id: string) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from("notes")
-    .select("*")
-    .eq("id", id)
-    .single()
-
-  if (error) {
-    console.error(error)
+export async function getNote(id: string): Promise<Note | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.get<Note>(`/notes/${id}`)
+  } catch {
     return null
   }
-
-  return data
 }
 
-export async function deleteNote(id: string) {
-  const supabase = await createClient()
+export async function updateNote(
+  id: string,
+  updates: Partial<Pick<Note, "title" | "content" | "tags" | "linked_book_id" | "linked_contact_id">>
+): Promise<Note | null> {
+  const api = await createServerApiClient()
+  try {
+    return await api.patch<Note>(`/notes/${id}`, { body: updates })
+  } catch {
+    return null
+  }
+}
 
-  const { error } = await supabase
-    .from("notes")
-    .delete()
-    .eq("id", id)
-
-  if (error) {
-    console.error(error)
+export async function deleteNote(id: string): Promise<boolean> {
+  const api = await createServerApiClient()
+  try {
+    await api.delete(`/notes/${id}`)
+    return true
+  } catch {
     return false
   }
-
-  return true
 }

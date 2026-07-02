@@ -36,6 +36,7 @@ export async function middleware(request: NextRequest) {
     "/settings",
     "/documents",
     "/reading-room",
+    "/search",
   ];
 
   const isProtected = protectedRoutes.some((route) =>
@@ -64,6 +65,7 @@ export const config = {
     "/settings/:path*",
     "/documents/:path*",
     "/reading-room/:path*",
+    "/search/:path*",
     "/login",
   ],
 };

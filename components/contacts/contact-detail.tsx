@@ -13,6 +13,7 @@ import {
 
 import { Contact } from "@/types/contact";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions";
 import { CallButton } from "@/components/contacts/call-button";
 
 import {
@@ -55,6 +56,7 @@ export function ContactDetail({
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<Contact>>({});
   const isMobile = useIsMobile();
+  const { isReadOnly } = useWorkspacePermissions();
 
   if (!contact) return null;
 
@@ -284,7 +286,7 @@ export function ContactDetail({
         </div>
 
         {/* Footer Actions */}
-        {!isEditing && (
+        {!isEditing && !isReadOnly && (
           <div className="flex gap-3 border-t border-app p-4">
             <Button
               variant="ghost"

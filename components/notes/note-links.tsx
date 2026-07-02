@@ -1,84 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { BookOpen, User } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
 import type { Book } from "@/types/book";
 import type { Contact } from "@/types/contact";
 import type { Note } from "@/types/note";
+import { useBooks } from "@/hooks/queries/use-books";
+import { useContacts } from "@/hooks/queries/use-contacts";
+import { useUpdateNote } from "@/hooks/queries/use-notes";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 export function NoteLinks({ note }: { note: Note }) {
-  const supabase = createClient();
-  const [books, setBooks] = useState<Book[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const { data: books = [] } = useBooks();
+  const { data: contacts = [] } = useContacts();
+  const updateNoteMutation = useUpdateNote();
+  const handleError = useApiErrorHandler();
+
   const [linkedBookId, setLinkedBookId] = useState(note.linked_book_id ?? "");
   const [linkedContactId, setLinkedContactId] = useState(
     note.linked_contact_id ?? "",
   );
 
-  useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const [booksRes, contactsRes] = await Promise.all([
-        supabase
-          .from("books")
-          .select("id, title, author")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(50),
-        supabase
-          .from("contacts")
-          .select("id, name")
-          .eq("user_id", user.id)
-          .order("name", { ascending: true })
-          .limit(50),
-      ]);
-
-      setBooks((booksRes.data as Book[]) || []);
-      setContacts((contactsRes.data as Contact[]) || []);
-    }
-    load();
-  }, [supabase]);
-
-  async function saveLinks(bookId: string | null, contactId: string | null) {
-    const { error } = await supabase
-      .from("notes")
-      .update({
+  function saveLinks(bookId: string | null, contactId: string | null) {
+    updateNoteMutation.mutate(
+      {
+        id: note.id,
         linked_book_id: bookId,
         linked_contact_id: contactId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", note.id);
-
-    if (error) {
-      if (error.code === "42703") {
-        toast.error("Run the v2 database migration to enable links");
-        return;
-      }
-      toast.error("Failed to save links");
-    }
+      },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+        },
+      },
+    );
   }
 
-  async function onBookChange(value: string) {
+  function onBookChange(value: string) {
     const id = value || null;
     setLinkedBookId(value);
-    await saveLinks(id, linkedContactId || null);
+    saveLinks(id, linkedContactId || null);
   }
 
-  async function onContactChange(value: string) {
+  function onContactChange(value: string) {
     const id = value || null;
     setLinkedContactId(value);
-    await saveLinks(linkedBookId || null, id);
+    saveLinks(linkedBookId || null, id);
   }
 
-  const linkedBook = books.find((b) => b.id === linkedBookId);
-  const linkedContact = contacts.find((c) => c.id === linkedContactId);
+  const linkedBook = books.find((b: Book) => b.id === linkedBookId);
+  const linkedContact = contacts.find((c: Contact) => c.id === linkedContactId);
 
   return (
     <div className="mb-8 space-y-4 rounded-2xl border border-app bg-app-elevated p-4">
@@ -99,7 +72,7 @@ export function NoteLinks({ note }: { note: Note }) {
             className="mt-1 w-full rounded-lg border border-app bg-app px-3 py-2 text-sm text-app"
           >
             <option value="">None</option>
-            {books.map((b) => (
+            {books.map((b: Book) => (
               <option key={b.id} value={b.id}>
                 {b.title}
               </option>
@@ -117,7 +90,7 @@ export function NoteLinks({ note }: { note: Note }) {
             className="mt-1 w-full rounded-lg border border-app bg-app px-3 py-2 text-sm text-app"
           >
             <option value="">None</option>
-            {contacts.map((c) => (
+            {contacts.map((c: Contact) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

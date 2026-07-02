@@ -17,14 +17,14 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toDateKey } from "@/lib/date";
+import { useCreateTask } from "@/hooks/queries/use-tasks";
+import { useCreateContact, useUpdateContact, useDeleteContact } from "@/hooks/queries/use-contacts";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions";
+import type { ApiClientError } from "@/lib/api-client";
 
 import { Contact } from "@/types/contact";
-
-import { createContact, updateContact, deleteContact } from "@/lib/contacts";
-
-
 
 import { ContactDetail } from "@/components/contacts/contact-detail";
 import { CallButton } from "@/components/contacts/call-button";
@@ -46,6 +46,13 @@ export function ContactsView({ initialContacts }: Props) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [showAllFavorites, setShowAllFavorites] = useState(false);
   const [showAllContacts, setShowAllContacts] = useState(false);
+
+  const createTaskMutation = useCreateTask();
+  const createContactMutation = useCreateContact();
+  const updateContactMutation = useUpdateContact();
+  const deleteContactMutation = useDeleteContact();
+  const handleError = useApiErrorHandler();
+  const { isReadOnly } = useWorkspacePermissions();
 
   const filteredContacts = useMemo(() => {
     return contacts.filter((contact) => {
@@ -79,7 +86,7 @@ export function ContactsView({ initialContacts }: Props) {
     ? otherContacts
     : otherContacts.slice(0, ITEMS_PER_SECTION);
 
-  async function handleAddContact() {
+  function handleAddContact() {
     const optimisticContact: Contact = {
       id: uuid(),
       user_id: "",
@@ -96,55 +103,46 @@ export function ContactsView({ initialContacts }: Props) {
 
     setContacts((prev) => [optimisticContact, ...prev]);
 
-    try {
-      const created = await createContact({
-        name: "New Contact",
-      });
-
-      setContacts((prev) =>
-        prev.map((contact) =>
-          contact.id === optimisticContact.id ? created : contact
-        )
-      );
-
-      toast.success("Contact created");
-    } catch {
-      setContacts((prev) =>
-        prev.filter((contact) => contact.id !== optimisticContact.id)
-      );
-
-      toast.error("Failed to create contact");
-    }
+    createContactMutation.mutate(
+      { name: "New Contact" },
+      {
+        onSuccess: (data) => {
+          setContacts((prev) =>
+            prev.map((contact) =>
+              contact.id === optimisticContact.id ? data : contact
+            )
+          );
+          toast.success("Contact created");
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setContacts((prev) =>
+            prev.filter((contact) => contact.id !== optimisticContact.id)
+          );
+        },
+      },
+    );
   }
 
-  async function createFollowUpTask(contact: Contact) {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      toast.error("Sign in to create tasks");
-      return;
-    }
-
+  function createFollowUpTask(contact: Contact) {
     const today = toDateKey();
-    const { error } = await supabase.from("tasks").insert({
-      user_id: user.id,
-      title: `Follow up with ${contact.name}`,
-      completed: false,
-      due_date: `${today}T12:00:00`,
-    });
-
-    if (error) {
-      toast.error("Failed to create task");
-      return;
-    }
-
-    toast.success("Follow-up task added for today");
+    createTaskMutation.mutate(
+      {
+        title: `Follow up with ${contact.name}`,
+        due_date: `${today}T12:00:00`,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Follow-up task added for today");
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+        },
+      },
+    );
   }
 
-  async function handleUpdate(id: string, updates: Partial<Contact>) {
+  function handleUpdate(id: string, updates: Partial<Contact>) {
     const previousContacts = contacts;
 
     setContacts((prev) =>
@@ -158,29 +156,31 @@ export function ContactsView({ initialContacts }: Props) {
       )
     );
 
-    try {
-      await updateContact(id, updates);
-    } catch {
-      setContacts(previousContacts);
-
-      toast.error("Failed to update contact");
-    }
+    updateContactMutation.mutate(
+      { id, ...updates },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+          setContacts(previousContacts);
+        },
+      },
+    );
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     const previousContacts = contacts;
 
     setContacts((prev) => prev.filter((contact) => contact.id !== id));
 
-    try {
-      await deleteContact(id);
-
-      toast.success("Contact deleted");
-    } catch {
-      setContacts(previousContacts);
-
-      toast.error("Failed to delete contact");
-    }
+    deleteContactMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success("Contact deleted");
+      },
+      onError: (error) => {
+        handleError(error as unknown as ApiClientError);
+        setContacts(previousContacts);
+      },
+    });
   }
 
   // Empty state when no contacts exist at all
@@ -191,8 +191,8 @@ export function ContactsView({ initialContacts }: Props) {
         icon={Users}
         heading="Your contacts live here"
         body="Add the people who matter to you — friends, colleagues, and collaborators."
-        actionLabel="Add Contact"
-        onAction={handleAddContact}
+        actionLabel={isReadOnly ? undefined : "Add Contact"}
+        onAction={isReadOnly ? undefined : handleAddContact}
       />
     );
   }
@@ -212,13 +212,15 @@ export function ContactsView({ initialContacts }: Props) {
           />
         </div>
 
-        <button
-          onClick={handleAddContact}
-          className="btn-primary-app flex items-center gap-2 px-4 py-2.5 text-sm"
-        >
-          <User className="h-4 w-4" aria-hidden="true" />
-          Add Contact
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={handleAddContact}
+            className="btn-primary-app flex items-center gap-2 px-4 py-2.5 text-sm"
+          >
+            <User className="h-4 w-4" aria-hidden="true" />
+            Add Contact
+          </button>
+        )}
       </div>
 
       {/* Empty search results */}
@@ -247,6 +249,7 @@ export function ContactsView({ initialContacts }: Props) {
                 key={contact.id}
                 contact={contact}
                 isMobile={isMobile}
+                isReadOnly={isReadOnly}
                 onSelect={() => {
                   setSelectedContact(contact);
                   setDetailOpen(true);
@@ -298,6 +301,7 @@ export function ContactsView({ initialContacts }: Props) {
                 key={contact.id}
                 contact={contact}
                 isMobile={isMobile}
+                isReadOnly={isReadOnly}
                 onSelect={() => {
                   setSelectedContact(contact);
                   setDetailOpen(true);
@@ -356,12 +360,14 @@ export function ContactsView({ initialContacts }: Props) {
 function ContactCard({
   contact,
   isMobile,
+  isReadOnly,
   onSelect,
   onUpdate,
   onFollowUp,
 }: {
   contact: Contact;
   isMobile: boolean;
+  isReadOnly: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<Contact>) => void;
   onFollowUp: (contact: Contact) => void;
@@ -399,33 +405,37 @@ function ContactCard({
           {isMobile && contact.phone && (
             <CallButton phone={contact.phone} contactName={contact.name} />
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onFollowUp(contact);
-            }}
-            className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
-            aria-label="Add follow-up task"
-          >
-            <CheckSquare className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdate(contact.id, { favorite: !contact.favorite });
-            }}
-            aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            <Star
-              className={`h-4 w-4 transition-colors ${
-                contact.favorite
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "text-app-muted"
-              }`}
-            />
-          </button>
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFollowUp(contact);
+              }}
+              className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+              aria-label="Add follow-up task"
+            >
+              <CheckSquare className="h-4 w-4" />
+            </button>
+          )}
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate(contact.id, { favorite: !contact.favorite });
+              }}
+              aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Star
+                className={`h-4 w-4 transition-colors ${
+                  contact.favorite
+                    ? "fill-yellow-400 text-yellow-400"
+                    : "text-app-muted"
+                }`}
+              />
+            </button>
+          )}
         </div>
       </div>
 
@@ -459,6 +469,7 @@ function ContactCard({
 function ContactListItem({
   contact,
   isMobile,
+  isReadOnly,
   onSelect,
   onUpdate,
   onDelete,
@@ -466,6 +477,7 @@ function ContactListItem({
 }: {
   contact: Contact;
   isMobile: boolean;
+  isReadOnly: boolean;
   onSelect: () => void;
   onUpdate: (id: string, updates: Partial<Contact>) => void;
   onDelete: (id: string) => void;
@@ -506,39 +518,45 @@ function ContactListItem({
         {isMobile && contact.phone && (
           <CallButton phone={contact.phone} contactName={contact.name} />
         )}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onFollowUp(contact);
-          }}
-          className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
-          aria-label="Add follow-up task"
-        >
-          <CheckSquare className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpdate(contact.id, { favorite: !contact.favorite });
-          }}
-          aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
-          className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
-        >
-          <Star className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(contact.id);
-          }}
-          className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
-          aria-label="Delete contact"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFollowUp(contact);
+            }}
+            className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+            aria-label="Add follow-up task"
+          >
+            <CheckSquare className="h-4 w-4" />
+          </button>
+        )}
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate(contact.id, { favorite: !contact.favorite });
+            }}
+            aria-label={contact.favorite ? "Remove from favorites" : "Add to favorites"}
+            className="rounded-lg p-1.5 text-app-muted transition hover:bg-app-elevated hover:text-app"
+          >
+            <Star className="h-4 w-4" />
+          </button>
+        )}
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(contact.id);
+            }}
+            className="rounded-lg p-1.5 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+            aria-label="Delete contact"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

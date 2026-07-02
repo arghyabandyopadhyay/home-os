@@ -17,6 +17,13 @@ import { Input } from "@/components/ui/input";
 import { PreferencesSection } from "@/components/settings/preferences-section";
 import { GoogleIntegrationsSection } from "@/components/settings/google-integrations-section";
 import { InstallAppSection } from "@/components/settings/install-app-section";
+import { NotificationsSettingsSection } from "@/components/settings/notifications-settings-section";
+import { createClientApiClient } from "@/lib/api-client";
+import { useDeleteAccount } from "@/hooks/queries/use-account";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 type ConnectionStatus = {
   connected: boolean;
@@ -46,6 +53,8 @@ export function SettingsClient({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const supabase = createClient();
+  const handleError = useApiErrorHandler();
+  const deleteAccountMutation = useDeleteAccount();
 
   const loadProfile = useCallback(async () => {
     try {
@@ -123,35 +132,7 @@ export function SettingsClient({
   const exportData = async () => {
     setLoading(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const [notes, tasks, contacts, books, events, profileData] =
-        await Promise.all([
-          supabase.from("notes").select("*").eq("user_id", user.id),
-          supabase.from("tasks").select("*").eq("user_id", user.id),
-          supabase.from("contacts").select("*").eq("user_id", user.id),
-          supabase.from("books").select("*").eq("user_id", user.id),
-          supabase.from("calendar_events").select("*").eq("user_id", user.id),
-          supabase
-            .from("profiles")
-            .select("preferences")
-            .eq("id", user.id)
-            .single(),
-        ]);
-
-      const data = {
-        exportedAt: new Date().toISOString(),
-        preferences: profileData.data?.preferences ?? {},
-        notes: notes.data || [],
-        tasks: tasks.data || [],
-        contacts: contacts.data || [],
-        books: books.data || [],
-        calendarEvents: events.data || [],
-      };
+      const data = await api.get<Record<string, unknown>>("/account/export");
 
       const dataStr = JSON.stringify(data, null, 2);
       const dataBlob = new Blob([dataStr], {
@@ -164,8 +145,8 @@ export function SettingsClient({
       link.click();
 
       toast.success("Data exported successfully");
-    } catch {
-      toast.error("Failed to export data");
+    } catch (error) {
+      handleError(error as ApiClientError);
     } finally {
       setLoading(false);
     }
@@ -182,17 +163,13 @@ export function SettingsClient({
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.admin.deleteUser(
-        (await supabase.auth.getUser()).data.user?.id || "",
-      );
-
-      if (error) throw error;
+      await deleteAccountMutation.mutateAsync();
 
       await supabase.auth.signOut();
       window.location.href = "/login";
       toast.success("Account deleted");
-    } catch {
-      toast.error("Failed to delete account");
+    } catch (error) {
+      handleError(error as ApiClientError);
     } finally {
       setLoading(false);
     }
@@ -389,6 +366,9 @@ export function SettingsClient({
         {/* Right Column */}
         <div className="space-y-6">
           <PreferencesSection />
+
+          {/* Notifications */}
+          <NotificationsSettingsSection />
 
           {/* Install App */}
           <InstallAppSection />

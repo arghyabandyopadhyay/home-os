@@ -16,8 +16,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { createClientApiClient } from "@/lib/api-client";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
+
+const api = createClientApiClient();
 
 type DayPanelProps = {
   date: Date;
@@ -66,7 +70,7 @@ export function DayPanel({
 }: DayPanelProps) {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const supabase = createClient();
+  const handleError = useApiErrorHandler();
 
   const dayEvents = getEventsForDate(events, date);
   const dayTasks = getTasksForDate(tasks, date);
@@ -81,16 +85,11 @@ export function DayPanel({
   async function handleDelete(eventId: string) {
     setDeletingId(eventId);
     try {
-      const { error } = await supabase
-        .from("calendar_events")
-        .delete()
-        .eq("id", eventId);
-
-      if (error) throw error;
+      await api.delete<void>(`/calendar/events/${eventId}`);
       onEventDeleted(eventId);
       toast.success("Event deleted");
-    } catch {
-      toast.error("Could not delete event");
+    } catch (error) {
+      handleError(error as ApiClientError);
     } finally {
       setDeletingId(null);
     }

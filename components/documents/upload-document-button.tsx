@@ -8,6 +8,10 @@ import { toast } from "sonner"
 import { validateUploadFile } from "@/lib/documents-utils"
 import { uploadWithProgress } from "@/lib/upload-with-progress"
 import { useRouter } from "next/navigation"
+import { createClientApiClient } from "@/lib/api-client"
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions"
+
+const api = createClientApiClient()
 
 /**
  * Client component button that handles document upload with progress.
@@ -16,6 +20,9 @@ import { useRouter } from "next/navigation"
 export function UploadDocumentButton({ variant = "primary" }: { variant?: "primary" | "inline" }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const { isReadOnly } = useWorkspacePermissions()
+
+  if (isReadOnly) return null
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -30,6 +37,7 @@ export function UploadDocumentButton({ variant = "primary" }: { variant?: "prima
       return
     }
 
+    // File upload still uses Supabase Storage for the binary upload
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -65,20 +73,16 @@ export function UploadDocumentButton({ variant = "primary" }: { variant?: "prima
 
       if (uploadError) throw uploadError
 
-      const { error: dbError } = await supabase
-        .from("documents")
-        .insert({
+      // Insert document metadata via API
+      await api.post("/documents", {
+        body: {
           id: documentId,
-          user_id: user.id,
           title: file.name.replace(/\.pdf$/i, ""),
           file_path: filePath,
           file_size: file.size,
-        })
-
-      if (dbError) {
-        await supabase.storage.from("documents").remove([filePath])
-        throw dbError
-      }
+        },
+        timeout: 120_000,
+      })
 
       toast.success("Document uploaded", { id: uploadToast })
       router.refresh()

@@ -19,6 +19,8 @@ type UploadWithProgressOptions = {
   onProgress: (percent: number) => void
   /** Auth token (JWT) for the request */
   token: string
+  /** Optional AbortSignal to cancel the upload */
+  signal?: AbortSignal
 }
 
 type UploadResult = {
@@ -33,6 +35,7 @@ export function uploadWithProgress({
   upsert = false,
   onProgress,
   token,
+  signal,
 }: UploadWithProgressOptions): Promise<UploadResult> {
   return new Promise((resolve) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -41,8 +44,28 @@ export function uploadWithProgress({
       return
     }
 
+    // If the signal is already aborted, resolve immediately
+    if (signal?.aborted) {
+      const err = new Error("Upload was cancelled")
+      err.name = "AbortError"
+      resolve({ error: err })
+      return
+    }
+
     const url = `${supabaseUrl}/storage/v1/object/${bucket}/${path}`
     const xhr = new XMLHttpRequest()
+
+    // Wire up the AbortSignal to abort the XHR
+    if (signal) {
+      const onAbort = () => {
+        xhr.abort()
+      }
+      signal.addEventListener("abort", onAbort, { once: true })
+      // Clean up listener when request completes
+      xhr.addEventListener("loadend", () => {
+        signal.removeEventListener("abort", onAbort)
+      })
+    }
 
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -72,7 +95,9 @@ export function uploadWithProgress({
     })
 
     xhr.addEventListener("abort", () => {
-      resolve({ error: new Error("Upload was cancelled") })
+      const err = new Error("Upload was cancelled")
+      err.name = "AbortError"
+      resolve({ error: err })
     })
 
     xhr.open("POST", url)

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Plus, Search, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import {
   truncatePreview,
   filterNotesByQuery,
@@ -13,6 +12,10 @@ import {
 } from "@/lib/notes-utils"
 import { usePreferences } from "@/components/providers/user-preferences-provider"
 import type { Note } from "@/types/note"
+import { useCreateNote } from "@/hooks/queries/use-notes"
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler"
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions"
+import type { ApiClientError } from "@/lib/api-client"
 
 const ITEMS_PER_PAGE = 5
 
@@ -26,9 +29,11 @@ export function NotesSidebar({
   activeNoteId,
 }: NotesSidebarProps) {
   const router = useRouter()
-  const supabase = createClient()
   const { prefs } = usePreferences()
   const pinnedIds = prefs.pinnedNoteIds ?? []
+  const createNoteMutation = useCreateNote()
+  const handleError = useApiErrorHandler()
+  const { isReadOnly } = useWorkspacePermissions()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
@@ -68,39 +73,34 @@ export function NotesSidebar({
   // Sort pinned to top
   filteredNotes = sortNotesByPin(filteredNotes, pinnedIds)
 
-  async function handleCreate() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data, error } = await supabase
-      .from("notes")
-      .insert({
-        user_id: user.id,
-        title: "Untitled",
-        content: "",
-      })
-      .select()
-      .single()
-
-    if (error || !data) return
-
-    router.push(`/notes/${data.id}`)
-    router.refresh()
+  function handleCreate() {
+    createNoteMutation.mutate(
+      { title: "Untitled", content: "" },
+      {
+        onSuccess: (data) => {
+          router.push(`/notes/${data.id}`)
+          router.refresh()
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+        },
+      },
+    )
   }
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between border-b border-app p-4">
         <h1 className="text-lg font-semibold">Notes</h1>
-        <button
-          onClick={handleCreate}
-          className="rounded-lg bg-white p-2 text-black transition hover:opacity-90"
-          aria-label="Create new note"
-        >
-          <Plus size={16} />
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={handleCreate}
+            className="rounded-lg bg-white p-2 text-black transition hover:opacity-90"
+            aria-label="Create new note"
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
 
       {/* Search input */}

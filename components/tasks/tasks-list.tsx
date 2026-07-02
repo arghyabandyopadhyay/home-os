@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Task } from "@/types/task"
 import { groupTasksBySection, countTodayIncomplete } from "@/lib/tasks-helpers"
 import { toast } from "sonner"
@@ -9,6 +8,10 @@ import { Calendar, CheckSquare, ChevronDown } from "lucide-react"
 import { v4 as uuid } from "uuid"
 import { formatDueLabel } from "@/lib/date"
 import { EmptyState } from "@/components/shared/empty-state"
+import { useCreateTask, useUpdateTask, useDeleteTask } from "@/hooks/queries/use-tasks"
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler"
+import { useWorkspacePermissions } from "@/hooks/use-workspace-permissions"
+import type { ApiClientError } from "@/lib/api-client"
 
 // ─── Priority helpers ─────────────────────────────────────────────────────────
 
@@ -66,6 +69,7 @@ type LocalTask = Task & { isNew?: boolean }
 
 type TaskRowProps = {
   task: LocalTask
+  isReadOnly: boolean
   onToggle: (id: string, completed: boolean) => void
   onUpdateTitle: (id: string, title: string) => void
   onSaveTitle: (id: string, title: string) => void
@@ -76,6 +80,7 @@ type TaskRowProps = {
 
 function TaskRow({
   task,
+  isReadOnly,
   onToggle,
   onUpdateTitle,
   onSaveTitle,
@@ -111,6 +116,7 @@ function TaskRow({
           type="checkbox"
           checked={task.completed}
           onChange={(e) => onToggle(task.id, e.target.checked)}
+          disabled={isReadOnly}
           className="h-5 w-5 shrink-0"
           aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
         />
@@ -127,6 +133,7 @@ function TaskRow({
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           placeholder="Task title…"
+          readOnly={isReadOnly}
           className={`min-w-0 flex-1 bg-transparent outline-none placeholder:text-app-muted ${
             task.completed ? "text-app-muted line-through" : "text-app"
           }`}
@@ -141,6 +148,7 @@ function TaskRow({
               (e.target.value as Priority) || null,
             )
           }
+          disabled={isReadOnly}
           className="hidden shrink-0 rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted sm:block"
           aria-label="Task priority"
         >
@@ -160,6 +168,7 @@ function TaskRow({
                 e.target.value ? `${e.target.value}T12:00:00` : null,
               )
             }
+            disabled={isReadOnly}
             className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
             title="Due date"
             aria-label="Due date"
@@ -172,13 +181,15 @@ function TaskRow({
           )}
         </div>
 
-        <button
-          onClick={() => onDelete(task.id)}
-          className="hidden shrink-0 text-sm text-red-400 transition hover:text-red-300 sm:block"
-          aria-label="Delete task"
-        >
-          Delete
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={() => onDelete(task.id)}
+            className="hidden shrink-0 text-sm text-red-400 transition hover:text-red-300 sm:block"
+            aria-label="Delete task"
+          >
+            Delete
+          </button>
+        )}
       </div>
 
       {/* Mobile-only controls row */}
@@ -191,6 +202,7 @@ function TaskRow({
               (e.target.value as Priority) || null,
             )
           }
+          disabled={isReadOnly}
           className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
           aria-label="Task priority"
         >
@@ -209,6 +221,7 @@ function TaskRow({
               e.target.value ? `${e.target.value}T12:00:00` : null,
             )
           }
+          disabled={isReadOnly}
           className="rounded-lg border border-app bg-app-elevated px-2 py-1 text-xs text-app-muted"
           title="Due date"
           aria-label="Due date"
@@ -221,13 +234,15 @@ function TaskRow({
           </span>
         )}
 
-        <button
-          onClick={() => onDelete(task.id)}
-          className="text-sm text-red-400 transition hover:text-red-300"
-          aria-label="Delete task"
-        >
-          Delete
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={() => onDelete(task.id)}
+            className="text-sm text-red-400 transition hover:text-red-300"
+            aria-label="Delete task"
+          >
+            Delete
+          </button>
+        )}
       </div>
 
       {validationMsg && (
@@ -242,13 +257,18 @@ function TaskRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
-  const supabase = createClient()
   const [tasks, setTasks] = useState<LocalTask[]>(initialTasks)
   const tasksRef = useRef<LocalTask[]>(initialTasks)
   const [viewMode, setViewMode] = useState<"today" | "all">("all")
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
 
   const ITEMS_PER_SECTION = 5
+
+  const createTaskMutation = useCreateTask()
+  const updateTaskMutation = useUpdateTask()
+  const deleteTaskMutation = useDeleteTask()
+  const handleError = useApiErrorHandler()
+  const { isReadOnly } = useWorkspacePermissions()
 
   useEffect(() => {
     tasksRef.current = tasks
@@ -257,7 +277,9 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
   // Listen for create task event from the page header action button
   useEffect(() => {
     function handleCreateEvent() {
-      createTask()
+      if (!isReadOnly) {
+        createTask()
+      }
     }
     window.addEventListener("tasks:create", handleCreateEvent)
     return () => window.removeEventListener("tasks:create", handleCreateEvent)
@@ -301,44 +323,33 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
     if (!title.trim()) return
 
     if (task.isNew) {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError || !user) {
-        toast.error("Failed to authenticate")
-        return
-      }
-
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert({ title, completed: false, user_id: user.id })
-        .select()
-        .single()
-
-      if (error) {
-        toast.error("Failed to create task")
-        setTasks((prev) => prev.filter((t) => t.id !== id))
-        return
-      }
-
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...data, isNew: false } : t)),
+      createTaskMutation.mutate(
+        { title },
+        {
+          onSuccess: (data) => {
+            setTasks((prev) =>
+              prev.map((t) => (t.id === id ? { ...data, isNew: false } : t)),
+            )
+          },
+          onError: (error) => {
+            handleError(error as unknown as ApiClientError)
+            setTasks((prev) => prev.filter((t) => t.id !== id))
+          },
+        },
       )
       return
     }
 
     const previous = tasksRef.current
-    const { error } = await supabase
-      .from("tasks")
-      .update({ title })
-      .eq("id", id)
-
-    if (error) {
-      toast.error("Failed to update task")
-      setTasks(previous)
-    }
+    updateTaskMutation.mutate(
+      { id, title },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+          setTasks(previous)
+        },
+      },
+    )
   }
 
   async function toggleTask(id: string, completed: boolean) {
@@ -347,15 +358,15 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
       prev.map((t) => (t.id === id ? { ...t, completed } : t)),
     )
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({ completed })
-      .eq("id", id)
-
-    if (error) {
-      toast.error("Failed to update task")
-      setTasks(previous)
-    }
+    updateTaskMutation.mutate(
+      { id, completed },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+          setTasks(previous)
+        },
+      },
+    )
   }
 
   async function updateDueDate(id: string, dueDate: string | null) {
@@ -367,15 +378,15 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
     const task = tasksRef.current.find((t) => t.id === id)
     if (task?.isNew) return
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({ due_date: dueDate })
-      .eq("id", id)
-
-    if (error) {
-      toast.error("Failed to update due date")
-      setTasks(previous)
-    }
+    updateTaskMutation.mutate(
+      { id, due_date: dueDate ?? undefined },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+          setTasks(previous)
+        },
+      },
+    )
   }
 
   async function updatePriority(id: string, priority: Task["priority"]) {
@@ -387,15 +398,15 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
     const task = tasksRef.current.find((t) => t.id === id)
     if (task?.isNew) return
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({ priority })
-      .eq("id", id)
-
-    if (error) {
-      toast.error("Failed to update priority")
-      setTasks(previous)
-    }
+    updateTaskMutation.mutate(
+      { id, priority: priority ?? undefined },
+      {
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError)
+          setTasks(previous)
+        },
+      },
+    )
   }
 
   async function deleteTask(id: string) {
@@ -405,17 +416,18 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
 
     if (task?.isNew) return
 
-    const { error } = await supabase.from("tasks").delete().eq("id", id)
-
-    if (error) {
-      toast.error("Failed to delete task")
-      setTasks(previous)
-    }
+    deleteTaskMutation.mutate(id, {
+      onError: (error) => {
+        handleError(error as unknown as ApiClientError)
+        setTasks(previous)
+      },
+    })
   }
 
   // ── Shared row props factory ───────────────────────────────────────────────
 
   const rowProps = {
+    isReadOnly,
     onToggle: toggleTask,
     onUpdateTitle: updateTitle,
     onSaveTitle: saveTitle,
@@ -444,8 +456,8 @@ export function TasksList({ tasks: initialTasks }: { tasks: Task[] }) {
         icon={CheckSquare}
         heading="Your tasks live here"
         body="Capture what needs doing — from daily errands to long-term goals. Start with your first task."
-        actionLabel="Create your first task"
-        onAction={createTask}
+        actionLabel={isReadOnly ? undefined : "Create your first task"}
+        onAction={isReadOnly ? undefined : createTask}
       />
     )
   }

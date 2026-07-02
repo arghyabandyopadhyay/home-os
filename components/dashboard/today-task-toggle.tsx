@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
+import { useUpdateTask } from "@/hooks/queries/use-tasks";
+import { useApiErrorHandler } from "@/hooks/use-api-error-handler";
+import type { ApiClientError } from "@/lib/api-client";
 
 export function TodayTaskToggle({
   taskId,
@@ -12,20 +13,21 @@ export function TodayTaskToggle({
   completed: boolean;
 }) {
   const router = useRouter();
-  const supabase = createClient();
+  const updateTaskMutation = useUpdateTask();
+  const handleError = useApiErrorHandler();
 
-  async function toggle(next: boolean) {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ completed: next })
-      .eq("id", taskId);
-
-    if (error) {
-      toast.error("Could not update task");
-      return;
-    }
-
-    router.refresh();
+  function toggle(next: boolean) {
+    updateTaskMutation.mutate(
+      { id: taskId, completed: next },
+      {
+        onSuccess: () => {
+          router.refresh();
+        },
+        onError: (error) => {
+          handleError(error as unknown as ApiClientError);
+        },
+      },
+    );
   }
 
   return (
